@@ -1,0 +1,12 @@
+# Defaults applied when sdkconfig is (re)generated. Permanent config changes go HERE,
+# not in sdkconfig (which is git-ignored). Regenerate with: rm sdkconfig && idf.py reconfigure
+CONFIG_IDF_TARGET="esp32"
+
+# The console shares UART0 with the data link. Log lines never start with '$', so the GUI
+# parser ignores them; switch to CONFIG_LOG_DEFAULT_LEVEL_NONE=y for the demo if desired.
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+
+# Baud rate used by the ROM/2nd-stage bootloader output and by `idf.py monitor`.
+# If LINK_BAUD in main/app_config.h is changed, run the monitor with `idf.py monitor -b <baud>`.
+CONFIG_ESP_CONSOLE_UART_BAUDRATE=115200
+CONFIG_ESPTOOLPY_MONITOR_BAUD=115200

@@ -1,0 +1,88 @@
+#include "uart_link.h"
+#include "app_config.h"
+#include "protocol.h"
+
+#include <string.h>
+
+#include "driver/uart.h"
+#include "driver/uart_vfs.h"
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+static const char *TAG = "uart_link";
+
+static uart_line_cb_t s_line_cb;
+
+void uart_link_init(void)
+{
+    const uart_config_t cfg = {
+        .baud_rate  = LINK_BAUD,
+        .data_bits  = UART_DATA_8_BITS,
+        .parity     = UART_PARITY_DISABLE,
+        .stop_bits  = UART_STOP_BITS_1,
+        .flow_ctrl  = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT,
+    };
+    ESP_ERROR_CHECK(uart_driver_install(LINK_UART_NUM, LINK_RX_BUF_SIZE, LINK_TX_BUF_SIZE, 0, NULL, 0));
+    ESP_ERROR_CHECK(uart_param_config(LINK_UART_NUM, &cfg));
+    /* UART0 pins already go to the USB bridge: no uart_set_pin() needed. */
+
+    /* Route stdout/ESP_LOG through the same driver so a log line can never be spliced
+     * byte-by-byte into the middle of a data frame. Log lines still show up on the PC,
+     * but as separate lines that do not start with '$', which the GUI parser ignores. */
+    uart_vfs_dev_use_driver(LINK_UART_NUM);
+
+    ESP_LOGI(TAG, "UART%d ready at %d baud", (int)LINK_UART_NUM, LINK_BAUD);
+}
+
+void uart_link_send_raw(const char *data, size_t len)
+{
+    /* uart_write_bytes() serialises concurrent callers with the driver's own mutex, so a
+     * frame written in one call is never interleaved with another task's frame. */
+    uart_write_bytes(LINK_UART_NUM, data, len);
+}
+
+void uart_link_send_frame(const char *payload)
+{
+    char frame[LINK_MAX_FRAME];
+    int n = proto_build(frame, sizeof frame, payload);
+    if (n < 0) {
+        ESP_LOGW(TAG, "frame too long, dropped (%u payload bytes)", (unsigned)strlen(payload));
+        return;
+    }
+    uart_link_send_raw(frame, (size_t)n);
+}
+
+/* Reads bytes from the PC, splits on CR/LF and delivers complete lines to the callback. */
+static void rx_task(void *arg)
+{
+    (void)arg;
+    static char line[LINK_MAX_LINE];
+    size_t pos = 0;
+    uint8_t buf[64];
+
+    for (;;) {
+        int n = uart_read_bytes(LINK_UART_NUM, buf, sizeof buf, pdMS_TO_TICKS(20));
+        for (int i = 0; i < n; i++) {
+            char c = (char)buf[i];
+            if (c == '\n' || c == '\r') {
+                if (pos > 0) {
+                    line[pos] = '\0';
+                    s_line_cb(line);
+                    pos = 0;
+                }
+            } else if (pos < sizeof line - 1) {
+                line[pos++] = c;
+            } else {
+                pos = 0;                                /* overlong garbage: discard the line */
+            }
+        }
+    }
+}
+
+void uart_link_start_rx_task(uart_line_cb_t cb)
+{
+    s_line_cb = cb;
+    xTaskCreate(rx_task, "uart_rx", 4096, NULL, 10, NULL);
+}
