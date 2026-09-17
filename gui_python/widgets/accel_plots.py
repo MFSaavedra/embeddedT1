@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Dict, Optional, Sequence
 
-import numpy as np  # noqa: F401  (ring buffers, PY4)
+import numpy as np
 import pyqtgraph as pg
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QVBoxLayout, QWidget
@@ -29,6 +29,12 @@ class AccelPlots(QWidget):
         self.window_s = DEFAULT_WINDOW_S
         self._plots: Dict[str, pg.PlotWidget] = {}
         self._curves: Dict[str, pg.PlotDataItem] = {}
+        self._cap = int(DEFAULT_WINDOW_S * MAX_FS_HZ) * 2
+        self._t: Dict[str, np.ndarray] = {a: np.zeros(self._cap) for a in AXES}
+        self._v: Dict[str, np.ndarray] = {a: np.zeros(self._cap) for a in AXES}
+        self._idx: Dict[str, int] = {a: 0 for a in AXES}
+        self._filled: Dict[str, int] = {a: 0 for a in AXES}
+        self._arrivals: Dict[str, int] = {a: 0 for a in AXES}
 
         layout = QVBoxLayout(self)
         for axis in AXES:
@@ -41,23 +47,36 @@ class AccelPlots(QWidget):
             self._plots[axis] = plot
             layout.addWidget(plot)
 
-        # TODO(PY4): allocate the ring buffers, e.g. per axis two np.empty(capacity) arrays
-        # (t_s, value) plus a write index, capacity = int(DEFAULT_WINDOW_S * MAX_FS_HZ) * 2.
-
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._redraw)
         self._timer.start(REFRESH_MS)
 
-    # ------------------------------------------------------------------ inputs
+    # --------------------------------- inputs ---------------------------------
 
     def push(self, axis: str, t0_ms: int, fs_hz: int, values: Sequence[float]) -> None:
         """Append one batch of samples for `axis` (called for every $ACC frame).
 
         t0_ms is the timestamp of values[0]; consecutive samples are 1/fs_hz apart.
         """
-        # TODO(PY4): t = t0_ms / 1000 + np.arange(len(values)) / fs_hz; append to the buffer.
-        # Also count arrivals here to compute the measured rate shown in the title.
-        pass
+        n = len(values)
+        if n == 0:
+            return
+        t = t0_ms / 1000.0 + np.arange(n) / fs_hz
+        v = np.asarray(values, dtype=float)
+
+        t_buf, v_buf, idx, cap = self._t[axis], self._v[axis], self._idx[axis], self._cap
+        end = idx + n
+        if end <= cap:
+            t_buf[idx:end] = t
+            v_buf[idx:end] = v
+        else:
+            first = cap - idx
+            t_buf[idx:cap], v_buf[idx:cap] = t[:first], v[:first]
+            t_buf[:end - cap], v_buf[:end - cap] = t[first:], v[first:]
+
+        self._idx[axis] = end % cap
+        self._filled[axis] = min(cap, self._filled[axis] + n)
+        self._arrivals[axis] += n
 
     def set_amplitude(self, axis: str, amp_g: int) -> None:
         """Make the y range follow the configured amplitude so a change is visible at once."""
@@ -65,14 +84,32 @@ class AccelPlots(QWidget):
 
     def clear(self) -> None:
         """Forget all samples (on connect / Inicializar)."""
-        # TODO(PY4): reset ring-buffer indices.
+        for axis in AXES:
+            self._idx[axis] = 0
+            self._filled[axis] = 0
+            self._arrivals[axis] = 0
         for curve in self._curves.values():
             curve.setData([], [])
 
-    # ----------------------------------------------------------------- redraw
+    # --------------------------------- redraw ---------------------------------
 
     def _redraw(self) -> None:
-        # TODO(PY4): for each axis take the newest `window_s` seconds from the ring buffer,
-        # curve.setData(t, v), keep the x range as [t_last - window_s, t_last], and update the
-        # title: plot.setTitle(f"Eje {axis} — {measured_rate:.0f} muestras/s").
-        pass
+        for axis in AXES:
+            filled = self._filled[axis]
+            rate = self._arrivals[axis] / (REFRESH_MS / 1000.0)
+            self._arrivals[axis] = 0
+            self._plots[axis].setTitle(f"Eje {axis} — {rate:.0f} muestras/s")
+            if filled == 0:
+                continue
+
+            idx, cap = self._idx[axis], self._cap
+            if filled < cap:
+                t, v = self._t[axis][:filled], self._v[axis][:filled]
+            else:
+                t = np.concatenate((self._t[axis][idx:], self._t[axis][:idx]))
+                v = np.concatenate((self._v[axis][idx:], self._v[axis][:idx]))
+
+            t_last = t[-1]
+            mask = t >= t_last - self.window_s
+            self._curves[axis].setData(t[mask], v[mask])
+            self._plots[axis].setXRange(t_last - self.window_s, t_last)

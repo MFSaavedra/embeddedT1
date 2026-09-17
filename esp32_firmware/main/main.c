@@ -29,10 +29,5 @@ void app_main(void)
     env_sim_init();
     uart_link_start_rx_task(commands_handle_line);
 
-    /* TODO(FW5): decide whether streaming starts at boot or only after $INIT from the GUI,
-     * and document the choice in README. Starting at boot is handy for `idf.py monitor` tests. */
-    accel_sim_start();
-    env_sim_start();
-
     ESP_LOGI(TAG, "Tarea1 DAQ firmware ready (link %d baud)", LINK_BAUD);
 }

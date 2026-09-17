@@ -71,7 +71,7 @@ class MainWindow(QMainWindow):
         self.config.setEnabled(False)
         self._refresh_ports()
 
-    # ------------------------------------------------------------ connection
+    # ------------------------------ connection ------------------------------
 
     def _refresh_ports(self) -> None:
         self.connection.set_ports(available_ports())
@@ -92,16 +92,11 @@ class MainWindow(QMainWindow):
     def _on_error(self, message: str) -> None:
         self.statusBar().showMessage(message, 5000)
 
-    # ------------------------------------------------------ outgoing commands
+    # --------------------------- outgoing commands ---------------------------
     # Payloads follow the DRAFT protocol in README.md; update both sides together.
 
     def _send_init(self) -> None:
-        if self.worker.send(protocol.CMD_INIT):
-            # TODO(PY3): wait for $ACK,INIT before resetting the panel (optimistic for now)
-            self.config.reset_defaults()
-            self.plots.clear()
-            for axis in self.config.axes:
-                self.plots.set_amplitude(axis, 4)
+        self.worker.send(protocol.CMD_INIT)
 
     def _send_axis_config(self, axis: str, func: int, amp_g: int, fs_hz: int) -> None:
         self.worker.send(f"{protocol.CMD_CFG},{axis},{func},{amp_g},{fs_hz}")
@@ -110,21 +105,33 @@ class MainWindow(QMainWindow):
     def _send_env_period(self, seconds: int) -> None:
         self.worker.send(f"{protocol.CMD_ENV},{seconds}")
 
-    # ------------------------------------------------------- incoming frames
+    # --------------------------- incoming frames ----------------------------
 
     def _on_frame(self, fields: List[str]) -> None:
         self._frames_ok += 1
         kind = fields[0]
         if kind == protocol.MSG_ACC:
-            # TODO(PY2): fields = ["ACC", axis, t0_ms, fs_hz, v1, v2, ...] (README "Protocol")
-            #   -> self.plots.push(axis, int(t0_ms), int(fs_hz), [float(v) for v in values])
-            # Wrap the conversions in try/except ValueError and count malformed frames.
-            pass
+            try:
+                axis, t0_ms, fs_hz = fields[1], int(fields[2]), int(fields[3])
+                values = [float(v) for v in fields[4:]]
+                self.plots.push(axis, t0_ms, fs_hz, values)
+            except (ValueError, IndexError):
+                self._frames_ok -= 1
+                self._frames_bad += 1
         elif kind == protocol.MSG_ENV:
-            # TODO(PY2): fields = ["ENV", temp_c, hum_pct] -> self.env.update_values(float, int)
-            pass
+            try:
+                temp_c, hum_pct = float(fields[1]), int(fields[2])
+                self.env.update_values(temp_c, hum_pct)
+            except (ValueError, IndexError):
+                self._frames_ok -= 1
+                self._frames_bad += 1
         elif kind == protocol.MSG_ACK:
             self.statusBar().showMessage("ESP32: OK " + ",".join(fields[1:]), 3000)
+            if len(fields) > 1 and fields[1] == protocol.CMD_INIT:
+                self.config.reset_defaults()
+                self.plots.clear()
+                for axis in self.config.axes:
+                    self.plots.set_amplitude(axis, 4)
         elif kind == protocol.MSG_ERR:
             self.statusBar().showMessage("ESP32: ERROR " + ",".join(fields[1:]), 5000)
         self._update_counters()
@@ -137,7 +144,7 @@ class MainWindow(QMainWindow):
         self._counter_label.setText(
             f"tramas OK: {self._frames_ok}   rechazadas: {self._frames_bad}")
 
-    # ---------------------------------------------------------------- close
+    # ----------------------------- close ----------------------------
 
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
         self.worker.close()

@@ -32,32 +32,58 @@ static void send_err(const char *why)
 /* $CFG,<axis>,<func>,<amp>,<fs> */
 static void handle_cfg(char *fields[], int n)
 {
-    /* TODO(FW5): expect n == 5; map fields[1] ("X"/"Y"/"Z") to axis_t; parse fields[2..4]
-     * with strtol; fill an axis_cfg_t; accel_sim_set_axis() validates the values and returns
-     * false on a bad one -> send_err("BADARG"); otherwise send_ack("CFG"). */
-    (void)fields;
-    (void)n;
-    send_err("NOTIMPL");
+    if (n != 5 || fields[1][0] == '\0' || fields[1][1] != '\0') {
+        send_err("BADARG");
+        return;
+    }
+    axis_t axis;
+    switch (fields[1][0]) {
+    case 'X': axis = AXIS_X; break;
+    case 'Y': axis = AXIS_Y; break;
+    case 'Z': axis = AXIS_Z; break;
+    default:  send_err("BADARG"); return;
+    }
+
+    axis_cfg_t cfg = {
+        .func  = (wave_func_t)strtol(fields[2], NULL, 10),
+        .amp_g = (uint8_t)strtol(fields[3], NULL, 10),
+        .fs_hz = (uint16_t)strtol(fields[4], NULL, 10),
+    };
+    if (!accel_sim_set_axis(axis, &cfg)) {
+        send_err("BADARG");
+        return;
+    }
+    send_ack("CFG");
 }
 
 /* $ENV,<period_s> */
 static void handle_env(char *fields[], int n)
 {
-    /* TODO(FW5): expect n == 2; env_sim_set_period(strtol(fields[1])) -> ACK,ENV / ERR,BADARG */
-    (void)fields;
-    (void)n;
-    send_err("NOTIMPL");
+    if (n != 2) {
+        send_err("BADARG");
+        return;
+    }
+    uint16_t seconds = (uint16_t)strtol(fields[1], NULL, 10);
+    if (!env_sim_set_period(seconds)) {
+        send_err("BADARG");
+        return;
+    }
+    send_ack("ENV");
 }
 
 /* $INIT */
 static void handle_init(char *fields[], int n)
 {
-    /* TODO(FW5): accel_sim_reset_defaults(), env period back to default, (re)start both
-     * simulators, then send_ack("INIT") - consider appending a firmware version/ID so the
-     * GUI can show "ESP32 ready (fw 1.0)". */
     (void)fields;
     (void)n;
-    send_err("NOTIMPL");
+    accel_sim_reset_defaults();
+    env_sim_set_period(ENV_DEFAULT_PERIOD_S);
+    accel_sim_start();
+    env_sim_start();
+
+    char payload[32];
+    snprintf(payload, sizeof payload, "ACK,INIT,%s", FW_VERSION);
+    uart_link_send_frame(payload);
 }
 
 void commands_handle_line(const char *line)
@@ -86,7 +112,4 @@ void commands_handle_line(const char *line)
     } else {
         send_err("UNKNOWN");
     }
-    /* send_ack() is only referenced from the TODO stubs above; this keeps -Wunused quiet
-     * until FW5 is implemented. */
-    (void)send_ack;
 }

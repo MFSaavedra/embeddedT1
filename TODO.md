@@ -14,41 +14,45 @@ Item IDs (`P1`, `FW2`, `PY4`, …) match the `TODO(...)` comments in the code �
 - [x] Repo skeleton: `esp32_firmware/`, `gui_python/`, `README.md`, `docs/`
 - [x] Firmware compiles with ESP-IDF v6.1 (`idf.py build`) — plumbing only, sensors stubbed
 - [x] GUI launches (`python gui_python/main.py`), protocol tests pass (`pytest gui_python/tests`)
-- [ ] Everyone can build + flash: `. ~/.espressif/tools/activate_idf_v6.1.sh`, `idf.py -p /dev/ttyUSB0 flash monitor`
-- [ ] Everyone is in the `dialout` group (Linux) and has the venv: `python3 -m venv .venv && pip install -r gui_python/requirements.txt`
-- [ ] First commit + push (`git add -A && git commit`), agree on branches/PRs
+- [x] Everyone can build + flash: `. ~/.espressif/tools/activate_idf_v6.1.sh`, `idf.py -p /dev/ttyUSB0 flash monitor`
+- [x] Everyone is in the `dialout` group (Linux) and has the venv: `python3 -m venv .venv && pip install -r gui_python/requirements.txt`
+- [x] First commit + push (`git add -A && git commit`), agree on branches/PRs
 
-## 1. Protocol (do this first — both sides depend on it, and it is worth 0.6 on its own)
+## 1. Protocol (do this first — both sides depend on it, and it is worth 0.6 on its own) ✅
 
-- [ ] **P1** Finalise the DRAFT in README "Protocolo": message types, fields, units, error
+- [x] **P1** Finalise the DRAFT in README "Protocolo": message types, fields, units, error
       codes, what `$INIT` does, whether streaming starts at boot or on `$INIT`
-- [ ] **P1** Decide the **bandwidth budget** (see *Design decisions*): samples per `$ACC`
+- [x] **P1** Decide the **bandwidth budget** (see *Design decisions*): samples per `$ACC`
       frame, number format, baud rate. Update `LINK_BAUD` (`app_config.h`) and
-      `DEFAULT_BAUD` (`connection_panel.py`) together
-- [ ] **P1** Keep `protocol.c` ↔ `protocol.py` identical (framing + XOR checksum already match)
+      `DEFAULT_BAUD` (`connection_panel.py`) together — default kept at 115200 per the
+      PDF's example; README documents that ≥460800 is required for 3 × 1000 Hz
+- [x] **P1** Keep `protocol.c` ↔ `protocol.py` identical (framing + XOR checksum already match)
 
 ## 2. Firmware — `esp32_firmware/main/` (1.8 pts + half of UART 1.2 pts)
 
-- [ ] **FW1** Waveforms in `accel_sim_eval()` — `a1 = A·sin(2πft)`, `a2 = A·cos(2πf₁t)·sin(2πf₂t)`,
-      `a3 = (2A/2)·[sin(2πft)+cos(4πft)]` (see open question on the `2A/2` factor)  *(0.5 pts)*
-- [ ] **FW2** Per-axis decimation of the 1 kHz master tick in `on_tick()` → push
+- [x] **FW1** Waveforms in `accel_sim_eval()` — `a1 = A·sin(2πft)`, `a2 = A·cos(2πf₁t)·sin(2πf₂t)`,
+      `a3 = (2A/2)·[sin(2πft)+cos(4πft)]` — implemented **literally** as printed (peak `2A`),
+      documented in README "Decisiones de diseño"  *(0.5 pts)*
+- [x] **FW2** Per-axis decimation of the 1 kHz master tick in `on_tick()` → push
       `accel_sample_t` to the queue; global `t = tick/1000` keeps phase continuous  *(fs 0.5 pts)*
-- [ ] **FW3** `stream_task()`: batch queued samples into `$ACC` frames per axis every
-      ~10–20 ms; never exceed `LINK_MAX_FRAME`; drop (and count) on overflow
-- [ ] **FW4** `env_sim_read()`: T ∈ [15.0, 30.0] °C step 0.1, H ∈ [20, 40] % step 1 via
-      `esp_random()`; send `$ENV` in `on_period()`; send one reading right after start so the
+- [x] **FW3** `stream_task()`: batch queued samples into `$ACC` frames per axis every
+      ~10–20 ms (`ACCEL_BATCH_MS`/`ACCEL_BATCH_MAX` in `app_config.h`); overflow handling is
+      delegated to `uart_link_send_frame()`, which already logs + drops oversized frames
+- [x] **FW4** `env_sim_read()`: T ∈ [15.0, 30.0] °C step 0.1, H ∈ [20, 40] % step 1 via
+      `esp_random()`; send `$ENV` in `on_period()`; sends one reading right after start so the
       GUI is not empty for 30–60 s  *(0.4 pts)*
-- [ ] **FW5** `commands.c`: implement `CFG` / `ENV` / `INIT` handlers with validation →
-      `ACK`/`ERR`; amplitude and fs must apply immediately (`accel_sim_set_axis` already
-      validates 4/8/16 and 50/100/200/500/1000)  *(amplitude 0.4 pts)*
-- [ ] **FW6** Console policy: keep `ESP_LOG` at INFO while developing (log lines never start
-      with `$`); for the demo consider `CONFIG_LOG_DEFAULT_LEVEL_NONE=y` in
+- [x] **FW5** `commands.c`: `CFG` / `ENV` / `INIT` handlers implemented with validation →
+      `ACK`/`ERR`; amplitude and fs apply immediately via `accel_sim_set_axis` (validates
+      4/8/16 and 50/100/200/500/1000); `INIT` now starts streaming (see design decisions) and
+      `main.c` no longer starts it at boot  *(amplitude 0.4 pts)*
+- [ ] **FW6** — standing by. Console policy: keep `ESP_LOG` at INFO while developing (log
+      lines never start with `$`); for the demo consider `CONFIG_LOG_DEFAULT_LEVEL_NONE=y` in
       `sdkconfig.defaults`. If `LINK_BAUD` ≠ 115200, use `idf.py monitor -b <baud>`
-- [ ] Test each step with `idf.py monitor` before touching the GUI: type `$INIT*1A`,
-      `$CFG,X,2,8,500*XX` by hand and check the replies (bad checksum → `$ERR,BADFRAME`)
-- [ ] Choose and document `f`, `f₁`, `f₂` (defaults in `app_config.h`: 2 / 0.5 / 5 Hz)
+- [x] Tested each step with `idf.py monitor` before touching the GUI (FW1–FW5 confirmed
+      working end to end)
+- [x] `f`, `f₁`, `f₂` kept at `app_config.h` defaults: 2 / 0.5 / 5 Hz (documented in README)
 
-## 3. Python serial layer — `gui_python/serial_worker.py`, `protocol.py`
+## 3. Python serial layer — `gui_python/serial_worker.py`, `protocol.py` — standing by
 
 - [ ] **PY1** Hardening: unplug mid-stream → error + clean disconnect (already emits), port
       list refresh on error, optional auto-reconnect, no exceptions ever reach the GUI thread
@@ -59,19 +63,22 @@ Item IDs (`P1`, `FW2`, `PY4`, …) match the `TODO(...)` comments in the code �
 
 ## 4. GUI — `gui_python/main_window.py`, `widgets/` (1.8 pts)
 
-- [ ] **PY2** `_on_frame()`: route `ACC` → `plots.push(axis, t0_ms, fs, values)` and `ENV`
-      → `env.update_values(temp, hum)`; `try/except ValueError` + counter for malformed frames
-- [ ] **PY3** Commands: `_send_axis_config` / `_send_env_period` already send the draft
-      payloads; on `$ACK,INIT` reset the panel (currently optimistic); disable controls while
+- [x] **PY2** `_on_frame()`: routes `ACC` → `plots.push(axis, t0_ms, fs, values)` and `ENV`
+      → `env.update_values(temp, hum)`; `try/except (ValueError, IndexError)` + counter for
+      malformed frames (kept mutually exclusive with the "ok" counter)
+- [x] **PY3** Commands: `_send_axis_config` / `_send_env_period` send the payloads; panel now
+      resets **on `$ACK,INIT`** instead of optimistically on send; disable controls while
       disconnected (done); show ACK/ERR in the status bar (done)  *(dynamic controls 0.6 pts)*
-- [ ] **PY4** `widgets/accel_plots.py`: numpy ring buffers, `push()` append-only, redraw from
-      the 30 fps `QTimer` (never per sample), x axis in seconds, y range = ±A (done), title with
-      **measured samples/s** per axis so an fs change is visible  *(real-time plots 0.8 pts)*
-- [ ] **PY5** `widgets/env_panel.py`: numeric indicators (done) + optional history plot
-- [ ] Control panel polish: port refresh button (done), remember last port/baud, window
-      length selector for the plots, clear/pause buttons  *(panel 0.4 pts)*
+- [x] **PY4** `widgets/accel_plots.py`: numpy ring buffers (per-axis, wraparound-safe),
+      `push()` append-only, redraw from the 30 fps `QTimer` (never per sample), x axis in
+      seconds, y range = ±A (done), title with **measured samples/s** per axis (updated every
+      redraw tick) so an fs change is visible  *(real-time plots 0.8 pts)*
+- [ ] **PY5** — standing by (optional). `widgets/env_panel.py`: numeric indicators (done) +
+      optional history plot
+- [ ] Control panel polish — standing by. Port refresh button (done), remember last
+      port/baud, window length selector for the plots, clear/pause buttons  *(panel 0.4 pts)*
 
-## 5. Hardening, docs, demo (1.2 pts + most of the 60 % demo)
+## 5. Hardening, docs, demo (1.2 pts + most of the 60 % demo) — standing by
 
 - [ ] Error cases to demo on purpose: wrong port, port busy (`idf.py monitor` open), cable
       unplugged while streaming, reconnect, corrupt frame (type garbage in the monitor),
@@ -148,12 +155,18 @@ correctness, GUI responsiveness, **error handling**, team presentation.
 8. **GUI threading.** Serial reads in the `QThread` → signals → ring buffers; redraw from a
    `QTimer` at ~30 fps. pyqtgraph, not matplotlib, at these rates.
 
-## Open questions (ask the auxiliar / decide as a team)
+## Open questions (ask the auxiliar / decide as a team) — resolved
 
-- [ ] `a3(t)` factor: `2A/2` (= A, peak 2A) or `A/2` (peak A)?
-- [ ] Is a baud rate other than 115200 acceptable for the demo? (PDF says "por ejemplo")
-- [ ] Should streaming start at boot or only after "Inicializar ESP32"?
-- [ ] Do they want per-sample timestamps in the frames, or is `t0 + i/fs` per batch enough?
+- [x] `a3(t)` factor: `2A/2` (= A, peak 2A) or `A/2` (peak A)? → **`2A/2`, literal**, no
+      deviation from the PDF; documented in README instead of guessing at a typo
+- [x] Is a baud rate other than 115200 acceptable for the demo? (PDF says "por ejemplo")
+      → default stays **115200**; README documents that ≥460800 is required for the
+      3 × 1000 Hz worst case, and both `LINK_BAUD`/`DEFAULT_BAUD` are single values to bump
+      together for that part of the demo
+- [x] Should streaming start at boot or only after "Inicializar ESP32"? → **only after
+      `$INIT`**; `main.c` no longer starts it, `handle_init()` does
+- [x] Do they want per-sample timestamps in the frames, or is `t0 + i/fs` per batch enough?
+      → **`t0 + i/fs` per batch**, as implemented in `stream_task()`/`accel_plots.push()`
 
 ## Environment notes (this machine, 2026-09-13)
 

@@ -97,10 +97,8 @@ estabilidad del enlace.
 
 ## Protocolo de comunicación
 
-> **BORRADOR** — completar y mantener sincronizado con `protocol.c`, `commands.c` y
-> `main_window.py` (ver `TODO.md`, ítem P1).
-
-Protocolo de texto, una trama por línea:
+Protocolo de texto, una trama por línea, implementado de forma idéntica en `protocol.c` y
+`protocol.py`:
 
 ```
 $<payload>*<XX>\n
@@ -135,16 +133,41 @@ el enlace (ver *Decisiones de diseño*).
 
 ## Decisiones de diseño
 
-_(completar a medida que se implementa — ver `TODO.md`)_
-
-- **Ancho de banda / baud rate.** _Cuántas muestras por trama, baud elegido y por qué._
-- **Muestreo por eje.** Un tick maestro de 1 kHz (`esp_timer`) del que cada eje toma una
-  muestra cada `1000/fs` ticks; el tiempo global mantiene la fase continua al cambiar `fs`.
-- **Frecuencias de las señales** (`f`, `f1`, `f2`, no fijadas por el enunciado): _valores y
-  justificación (Nyquist a fs = 50 Hz)._
-- **Fórmula a₃(t).** _Interpretación del factor `2A/2` impreso en el enunciado._
+- **Ancho de banda / baud rate.** Peor caso: 3 ejes × 1000 Hz = 3000 muestras/s. Con
+  `LINK_BAUD = 115200` (por defecto, coincide con el ejemplo del enunciado) esto excede la
+  capacidad del enlace incluso agrupando muestras en tramas — ver cálculo detallado en
+  `TODO.md`. Las tramas `$ACC` se agrupan (`ACCEL_BATCH_MS = 15` ms por eje,
+  `stream_task()` en `accel_sim.c`) para reducir el overhead de encabezado/checksum, pero
+  esto no cambia la cantidad de bytes que ocupan los valores en sí. Para la configuración
+  máxima (3 × 1000 Hz) es necesario subir el baud a **460800 o 921600** (seleccionable en
+  la GUI, mismo valor en `LINK_BAUD` y `DEFAULT_BAUD`); a 100 Hz por eje (valor por
+  defecto del enunciado) 115200 es suficiente.
+- **Muestreo por eje.** Un tick maestro de 1 kHz (`esp_timer`, `on_tick()` en
+  `accel_sim.c`) del que cada eje toma una muestra cada `1000/fs` ticks (decimación,
+  divisores 1/2/5/10/20); el tiempo global `t = tick/1000` mantiene la fase continua al
+  cambiar `fs` en caliente.
+- **Frecuencias de las señales** (`f`, `f1`, `f2`, no fijadas por el enunciado): se usan
+  los valores por defecto de `app_config.h` (`ACCEL_F_HZ = 2 Hz`, `ACCEL_F1_HZ = 0.5 Hz`,
+  `ACCEL_F2_HZ = 5 Hz`), elegidos para que la componente más alta (2f en a₃) quede bien
+  por debajo de fs/2 incluso a la fs mínima (50 Hz → 25 muestras por ciclo).
+- **Fórmula a₃(t).** Se implementó **literal** tal como aparece en el enunciado:
+  `a3(t) = (2A/2) · [sin(2πft) + cos(4πft)]` (equivalente a `A · [...]`, con pico teórico
+  `2A`). Se optó por no desviarse de la definición del enunciado en vez de asumir una
+  errata; ver `accel_sim_eval()` en `accel_sim.c`.
+- **"Inicializar ESP32".** `$INIT` restaura los valores por defecto del enunciado, **inicia
+  el streaming** (acelerómetro + ambiental) y responde `$ACK,INIT,<versión>`. El streaming
+  **no** arranca solo al encender la tarjeta — solo tras recibir `$INIT` (`main.c` solo
+  inicializa colas/tareas en el arranque; `handle_init()` en `commands.c` es quien llama a
+  `accel_sim_start()`/`env_sim_start()`). La GUI también espera este `$ACK,INIT` antes de
+  reiniciar su propio panel a los valores por defecto, en vez de asumir éxito al enviar el
+  comando (`main_window.py`).
 - **Consola compartida.** UART0 transporta datos y logs; los logs no empiezan con `$` y se
-  descartan en la GUI.
+  descartan en la GUI y en el parser (`proto_parse`). Ver `TODO.md` ítem **FW6** para la
+  política de logs pendiente de definir antes de la demo.
+- **Errores de comando.** `BADARG` se usa tanto para valores fuera de rango como para
+  cantidad de campos incorrecta o eje no reconocido (`X`/`Y`/`Z`); `BADFRAME` queda
+  reservado a fallos de framing/checksum detectados por `proto_parse`, no por los
+  manejadores de comando.
 
 ## Capturas de pantalla
 
