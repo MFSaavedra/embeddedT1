@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLa
 ## Baud rates offered in the combo box (the higher ones are needed for 3 x 1000 Hz).
 BAUD_RATES = [115200, 230400, 460800, 921600]
 ## Preselected baud rate; keep in sync with LINK_BAUD in esp32_firmware/main/app_config.h.
-DEFAULT_BAUD = 115200
+DEFAULT_BAUD = 921600
 
 
 class ConnectionPanel(QGroupBox):

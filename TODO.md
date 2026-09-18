@@ -45,9 +45,14 @@ Item IDs (`P1`, `FW2`, `PY4`, …) match the `TODO(...)` comments in the code �
       `ACK`/`ERR`; amplitude and fs apply immediately via `accel_sim_set_axis` (validates
       4/8/16 and 50/100/200/500/1000); `INIT` now starts streaming (see design decisions) and
       `main.c` no longer starts it at boot  *(amplitude 0.4 pts)*
-- [ ] **FW6** — standing by. Console policy: keep `ESP_LOG` at INFO while developing (log
-      lines never start with `$`); for the demo consider `CONFIG_LOG_DEFAULT_LEVEL_NONE=y` in
-      `sdkconfig.defaults`. If `LINK_BAUD` ≠ 115200, use `idf.py monitor -b <baud>`
+- [x] **FW6** Link fixed at **921600** on both sides (`LINK_BAUD`, `DEFAULT_BAUD`, console and
+      monitor baud in `sdkconfig.defaults`): with the implemented `$ACC` format 3 × 500 Hz
+      needs 165 kbaud and 3 × 1000 Hz 284 kbaud (143 % / 247 % of 115200, 18 % / 31 % of
+      921600). `on_tick()` now counts queue drops and `stream_task()` warns once per second
+      if the link saturates. **After pulling: `rm esp32_firmware/sdkconfig && idf.py
+      reconfigure`** (sdkconfig is generated and git-ignored). Console policy: keep
+      `ESP_LOG` at INFO (log lines never start with `$`); `CONFIG_LOG_DEFAULT_LEVEL_NONE=y`
+      remains an option for the demo
 - [x] Tested each step with `idf.py monitor` before touching the GUI (FW1–FW5 confirmed
       working end to end)
 - [x] `f`, `f₁`, `f₂` kept at `app_config.h` defaults: 2 / 0.5 / 5 Hz (documented in README)
@@ -160,9 +165,8 @@ correctness, GUI responsiveness, **error handling**, team presentation.
 - [x] `a3(t)` factor: `2A/2` (= A, peak 2A) or `A/2` (peak A)? → **`2A/2`, literal**, no
       deviation from the PDF; documented in README instead of guessing at a typo
 - [x] Is a baud rate other than 115200 acceptable for the demo? (PDF says "por ejemplo")
-      → default stays **115200**; README documents that ≥460800 is required for the
-      3 × 1000 Hz worst case, and both `LINK_BAUD`/`DEFAULT_BAUD` are single values to bump
-      together for that part of the demo
+      → the PDF only gives 115200 as an example; the link is fixed at **921600** on both
+      sides (see FW6) because 115200 cannot carry 3 × 500 Hz, let alone 3 × 1000 Hz
 - [x] Should streaming start at boot or only after "Inicializar ESP32"? → **only after
       `$INIT`**; `main.c` no longer starts it, `handle_init()` does
 - [x] Do they want per-sample timestamps in the frames, or is `t0 + i/fs` per batch enough?

@@ -17,7 +17,9 @@
  * @{
  */
 #define LINK_UART_NUM       UART_NUM_0  /**< USB-serial bridge on the dev board (shared with the console). */
-#define LINK_BAUD           115200      /**< TODO(FW6): raise to 921600 if the bandwidth budget needs it. */
+#define LINK_BAUD           921600      /**< Link speed, must equal DEFAULT_BAUD in the GUI. Worst case
+                                         *   (3 axes x 1000 Hz, 15 ms batches, "%.3f" values) needs
+                                         *   ~284 kbaud: 247 % of 115200 but 31 % of 921600. */
 #define LINK_RX_BUF_SIZE    1024        /**< Driver RX ring buffer, bytes. */
 #define LINK_TX_BUF_SIZE    4096        /**< Driver TX ring buffer, bytes (frames are copied into it). */
 #define LINK_MAX_LINE       128         /**< Longest accepted command line (PC -> ESP32), bytes. */

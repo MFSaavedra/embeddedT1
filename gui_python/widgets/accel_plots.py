@@ -7,9 +7,13 @@ Design (see TODO.md PY4):
 - a single QTimer repaints all three curves at ~30 fps - never redraw per sample;
 - the x axis is in seconds, so a change of fs shows up as denser/sparser points; the
   y range follows the configured amplitude (+-A), so a change of A is obvious at once;
-- each plot title shows the *measured* incoming rate, which doubles as a link-health check.
+- each plot title shows the *measured* incoming rate, averaged over RATE_WINDOW_S so it
+  reads steadily instead of flickering between quantised per-tick values; it doubles as a
+  link-health check (a rate below the configured fs means samples are being dropped).
 """
 from __future__ import annotations
+
+import time
 
 from typing import Dict, Optional, Sequence
 
@@ -22,6 +26,8 @@ from PyQt5.QtWidgets import QVBoxLayout, QWidget
 AXES = ("X", "Y", "Z")
 ## Redraw period in ms (~30 fps).
 REFRESH_MS = 33
+## Averaging window for the measured samples/s shown in each title, seconds.
+RATE_WINDOW_S = 1.0
 ## Width of the sliding window in seconds.
 DEFAULT_WINDOW_S = 5.0
 ## Highest sample rate the buffers must hold, Hz.
@@ -57,8 +63,12 @@ class AccelPlots(QWidget):
         self._idx: Dict[str, int] = {a: 0 for a in AXES}
         ## Number of valid samples in the ring buffer (saturates at _cap), per axis.
         self._filled: Dict[str, int] = {a: 0 for a in AXES}
-        ## Samples received since the last redraw, per axis (for the measured rate).
+        ## Samples received since the rate window started, per axis.
         self._arrivals: Dict[str, int] = {a: 0 for a in AXES}
+        ## Last measured rate in samples/s, per axis (shown in the title).
+        self._rate: Dict[str, float] = {a: 0.0 for a in AXES}
+        ## Start of the current rate-averaging window (time.monotonic()).
+        self._rate_t0 = time.monotonic()
 
         layout = QVBoxLayout(self)
         for axis in AXES:
@@ -126,6 +136,9 @@ class AccelPlots(QWidget):
             self._idx[axis] = 0
             self._filled[axis] = 0
             self._arrivals[axis] = 0
+            self._rate[axis] = 0.0
+            self._plots[axis].setTitle(f"Eje {axis} — 0 muestras/s")
+        self._rate_t0 = time.monotonic()
         for curve in self._curves.values():
             curve.setData([], [])
 
@@ -136,12 +149,17 @@ class AccelPlots(QWidget):
 
         Unrolls the ring buffer in chronological order, keeps only the last window_s
         seconds and scrolls the x range so the newest sample sits at the right edge.
+        The measured rate is recomputed once every RATE_WINDOW_S from the samples that
+        arrived in that window (arrivals / elapsed), not per redraw tick.
         """
+        elapsed = time.monotonic() - self._rate_t0
+        update_rate = elapsed >= RATE_WINDOW_S
         for axis in AXES:
             filled = self._filled[axis]
-            rate = self._arrivals[axis] / (REFRESH_MS / 1000.0)
-            self._arrivals[axis] = 0
-            self._plots[axis].setTitle(f"Eje {axis} — {rate:.0f} muestras/s")
+            if update_rate:
+                self._rate[axis] = self._arrivals[axis] / elapsed
+                self._arrivals[axis] = 0
+                self._plots[axis].setTitle(f"Eje {axis} — {self._rate[axis]:.0f} muestras/s")
             if filled == 0:
                 continue
 
@@ -156,3 +174,6 @@ class AccelPlots(QWidget):
             mask = t >= t_last - self.window_s
             self._curves[axis].setData(t[mask], v[mask])
             self._plots[axis].setXRange(t_last - self.window_s, t_last)
+        if update_rate:
+            self._rate_t0 += elapsed
+

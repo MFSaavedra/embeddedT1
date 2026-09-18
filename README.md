@@ -70,7 +70,9 @@ Notas:
   monitor antes de conectar desde la aplicación.
 - Los cambios permanentes de configuración van en `sdkconfig.defaults` (`sdkconfig` está
   ignorado por git). Para regenerarlo: `rm sdkconfig && idf.py reconfigure`.
-- Si se cambia `LINK_BAUD` en `main/app_config.h`, usar `idf.py monitor -b <baud>`.
+- El enlace funciona a **921600 baud** (`LINK_BAUD` en `main/app_config.h`); el monitor usa
+  la misma velocidad vía `sdkconfig.defaults`. Tras cambiar `sdkconfig.defaults` (p. ej. al
+  hacer `git pull`) hay que regenerar: `rm sdkconfig && idf.py reconfigure`.
 
 ## Ejecución de la aplicación
 
@@ -89,9 +91,10 @@ Doxygen; `doxygen` desde la raíz del repositorio genera `docs/doxygen/html/inde
 ## Uso
 
 1. Conectar el ESP32 por USB, elegir el puerto (`/dev/ttyUSB0`, `COMx`) y el baud rate
-   (115200 por defecto, debe coincidir con `LINK_BAUD` del firmware) y pulsar **Conectar**.
-   Al abrir el puerto la tarjeta se reinicia (señal DTR); las primeras líneas del bootloader
-   se descartan automáticamente.
+   (921600 por defecto; debe coincidir con `LINK_BAUD` del firmware, que es fijo en tiempo
+   de compilación) y pulsar **Conectar**. Al abrir el puerto la tarjeta se reinicia (señal
+   DTR); las primeras líneas del bootloader ROM llegan a 115200 y se descartan
+   automáticamente (el contador de tramas rechazadas sube unas pocas unidades).
 2. Pulsar **Inicializar ESP32**: el firmware vuelve a los valores por defecto del enunciado
    (armónica simple, 4 g, 100 Hz, ambiental cada 30 s) y responde con `ACK`.
 3. Cambiar función / amplitud / frecuencia de muestreo de cada eje: el cambio se envía de
@@ -140,15 +143,27 @@ el enlace (ver *Decisiones de diseño*).
 
 ## Decisiones de diseño
 
-- **Ancho de banda / baud rate.** Peor caso: 3 ejes × 1000 Hz = 3000 muestras/s. Con
-  `LINK_BAUD = 115200` (por defecto, coincide con el ejemplo del enunciado) esto excede la
-  capacidad del enlace incluso agrupando muestras en tramas — ver cálculo detallado en
-  `TODO.md`. Las tramas `$ACC` se agrupan (`ACCEL_BATCH_MS = 15` ms por eje,
-  `stream_task()` en `accel_sim.c`) para reducir el overhead de encabezado/checksum, pero
-  esto no cambia la cantidad de bytes que ocupan los valores en sí. Para la configuración
-  máxima (3 × 1000 Hz) es necesario subir el baud a **460800 o 921600** (seleccionable en
-  la GUI, mismo valor en `LINK_BAUD` y `DEFAULT_BAUD`); a 100 Hz por eje (valor por
-  defecto del enunciado) 115200 es suficiente.
+- **Ancho de banda / baud rate.** Peor caso: 3 ejes × 1000 Hz = 3000 muestras/s. Las
+  tramas `$ACC` se agrupan por eje cada `ACCEL_BATCH_MS = 15` ms (`stream_task()` en
+  `accel_sim.c`) para amortizar el encabezado y el checksum, pero cada valor sigue ocupando
+  ~8 bytes (`-16.000,`). Con el formato implementado el enlace necesita:
+
+  | Configuración | Necesario | Uso @115200 | Uso @921600 |
+  |---|---|---|---|
+  | 3 × 100 Hz (por defecto) | 87 kbaud | 76 % | 9 % |
+  | 3 × 500 Hz | 165 kbaud | **143 %** | 18 % |
+  | 1000 + 100 + 100 Hz | 153 kbaud | **133 %** | 17 % |
+  | 3 × 1000 Hz | 284 kbaud | **247 %** | 31 % |
+
+  A 115200 (el ejemplo del enunciado) cualquier eje a 1000 Hz o los tres a 500 Hz saturan
+  el enlace: `uart_write_bytes()` bloquea la tarea de streaming, la cola se llena y
+  `on_tick()` descarta muestras, de modo que las tramas contienen muestras no consecutivas
+  etiquetadas como consecutivas (forma de onda distorsionada). Por eso el enlace se fija en
+  **921600 baud** en ambos extremos (`LINK_BAUD` en el firmware, `DEFAULT_BAUD` en la GUI;
+  el puente USB-serial CP2102 de la tarjeta lo soporta). El selector de baud de la GUI debe
+  coincidir con el valor compilado en el firmware: no lo cambia. Si aun así se descartan
+  muestras, el firmware lo avisa en el monitor (`samples dropped so far: link saturated`) y
+  la GUI lo muestra como una tasa medida menor que la configurada.
 - **Muestreo por eje.** Un tick maestro de 1 kHz (`esp_timer`, `on_tick()` en
   `accel_sim.c`) del que cada eje toma una muestra cada `1000/fs` ticks (decimación,
   divisores 1/2/5/10/20); el tiempo global `t = tick/1000` mantiene la fase continua al

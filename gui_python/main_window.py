@@ -195,6 +195,7 @@ class MainWindow(QMainWindow):
             if len(fields) > 1 and fields[1] == protocol.CMD_INIT:
                 self.config.reset_defaults()
                 self.plots.clear()
+                self.env.clear()      # the firmware sends a fresh $ENV right after this ACK
                 for axis in self.config.axes:
                     self.plots.set_amplitude(axis, 4)
         elif kind == protocol.MSG_ERR:

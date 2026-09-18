@@ -36,6 +36,7 @@ static esp_timer_handle_t s_tick_timer;         /**< Periodic ACCEL_TICK_HZ mast
 static QueueHandle_t     s_sample_queue;        /**< accel_sample_t items, on_tick() -> stream_task() */
 static uint32_t          s_tick;                /**< Master tick count; advances only while running */
 static volatile bool     s_running;             /**< True between accel_sim_start() and accel_sim_stop() */
+static volatile uint32_t s_dropped;             /**< Samples lost because the queue was full (link saturated) */
 
 /** Samples of one axis waiting to be sent as a single ACC frame. */
 typedef struct {
@@ -108,7 +109,9 @@ static void on_tick(void *arg)
                 .axis  = (axis_t)a,
                 .value = accel_sim_eval(cfg.func, cfg.amp_g, t_s),
             };
-            xQueueSend(s_sample_queue, &s, 0);   /* 0 timeout: drop instead of blocking the timer */
+            if (xQueueSend(s_sample_queue, &s, 0) != pdTRUE) {   /* 0 timeout: never block the timer */
+                s_dropped++;   /* stream_task is stuck in uart_write_bytes(): the link is saturated */
+            }
         }
     }
 }
@@ -149,15 +152,30 @@ static void flush_axis(axis_t axis)
  * about ACCEL_BATCH_MS worth of samples at the axis' current fs (at least 1, at most
  * ACCEL_BATCH_MAX). Blocks on the queue while idle. Never returns.
  *
+ * Samples dropped by on_tick() (queue full because this task was blocked writing to a
+ * saturated UART) are reported with a warning at most once per second, so a baud rate
+ * that is too low for the selected sample rates shows up in `idf.py monitor`.
+ *
  * @param arg  Unused (FreeRTOS task parameter).
  */
 static void stream_task(void *arg)
 {
     (void)arg;
     accel_sample_t sample;
+    uint32_t reported_drops = 0;
+    int64_t  last_report_us = 0;
     for (;;) {
         if (xQueueReceive(s_sample_queue, &sample, portMAX_DELAY) != pdTRUE) {
             continue;
+        }
+
+        uint32_t dropped = s_dropped;
+        int64_t now_us = esp_timer_get_time();
+        if (dropped != reported_drops && now_us - last_report_us > 1000000) {
+            ESP_LOGW(TAG, "%lu samples dropped so far: link saturated, raise LINK_BAUD",
+                     (unsigned long)dropped);
+            reported_drops = dropped;
+            last_report_us = now_us;
         }
 
         axis_batch_t *b = &s_batch[sample.axis];

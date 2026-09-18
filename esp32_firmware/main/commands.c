@@ -11,6 +11,8 @@
 #include "protocol.h"
 #include "uart_link.h"
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,13 +48,36 @@ static void send_err(const char *why)
 }
 
 /**
+ * @brief Parse one numeric command field strictly.
+ *
+ * Unlike a bare strtol(), this rejects empty fields, trailing garbage ("10x") and values
+ * outside [lo, hi], so a later narrowing cast can never wrap (e.g. 260 -> 4 as uint8_t).
+ *
+ * @param[in]  s    NUL-terminated field text.
+ * @param      lo   Smallest accepted value.
+ * @param      hi   Largest accepted value.
+ * @param[out] out  Parsed value, only written on success.
+ * @return true if @p s is a decimal integer within [lo, hi].
+ */
+static bool parse_field(const char *s, long lo, long hi, long *out)
+{
+    char *end = NULL;
+    long v = strtol(s, &end, 10);
+    if (end == s || *end != '\0' || v < lo || v > hi) {
+        return false;
+    }
+    *out = v;
+    return true;
+}
+
+/**
  * @brief Handle a CFG command: reconfigure one accelerometer axis.
  *
  *     CFG,<X|Y|Z>,<func>,<amp>,<fs>
  *
  * Replies ACK,CFG on success, or ERR,BADARG if the field count, the axis letter or any
- * value is outside the allowed set (accel_sim_set_axis() validates func / amp / fs; a
- * non-numeric field parses as 0 and is rejected the same way).
+ * value is not a well-formed integer in range (parse_field()) or outside the allowed set
+ * (accel_sim_set_axis() validates func / amp / fs).
  *
  * @param[in] fields  Payload fields as split by proto_split(); fields[0] is "CFG".
  * @param     n       Number of entries in @p fields.
@@ -71,10 +96,17 @@ static void handle_cfg(char *fields[], int n)
     default:  send_err("BADARG"); return;
     }
 
+    long func, amp, fs;
+    if (!parse_field(fields[2], 0, UINT8_MAX, &func) ||
+        !parse_field(fields[3], 0, UINT8_MAX, &amp) ||
+        !parse_field(fields[4], 0, UINT16_MAX, &fs)) {
+        send_err("BADARG");
+        return;
+    }
     axis_cfg_t cfg = {
-        .func  = (wave_func_t)strtol(fields[2], NULL, 10),
-        .amp_g = (uint8_t)strtol(fields[3], NULL, 10),
-        .fs_hz = (uint16_t)strtol(fields[4], NULL, 10),
+        .func  = (wave_func_t)func,
+        .amp_g = (uint8_t)amp,
+        .fs_hz = (uint16_t)fs,
     };
     if (!accel_sim_set_axis(axis, &cfg)) {
         send_err("BADARG");
@@ -99,8 +131,8 @@ static void handle_env(char *fields[], int n)
         send_err("BADARG");
         return;
     }
-    uint16_t seconds = (uint16_t)strtol(fields[1], NULL, 10);
-    if (!env_sim_set_period(seconds)) {
+    long seconds;
+    if (!parse_field(fields[1], 0, UINT16_MAX, &seconds) || !env_sim_set_period((uint16_t)seconds)) {
         send_err("BADARG");
         return;
     }
@@ -112,9 +144,11 @@ static void handle_env(char *fields[], int n)
  *
  *     INIT
  *
- * Resets the three axes and the environmental period to the app_config.h defaults, starts
- * both simulators (no-op if already running) and replies ACK,INIT,FW_VERSION. Streaming
- * starts only here, never at boot.
+ * Resets the three axes and the environmental period to the app_config.h defaults, replies
+ * ACK,INIT,FW_VERSION and then (re)starts both simulators. Streaming starts only here, never
+ * at boot. The environmental simulator is stopped first so that env_sim_start() emits a fresh
+ * $ENV reading on every INIT, not just the first; the ACK is sent before any data so the GUI
+ * clears its panels on the ACK and then receives the new values.
  *
  * @param fields  Unused.
  * @param n       Unused.
@@ -124,13 +158,15 @@ static void handle_init(char *fields[], int n)
     (void)fields;
     (void)n;
     accel_sim_reset_defaults();
+    env_sim_stop();
     env_sim_set_period(ENV_DEFAULT_PERIOD_S);
-    accel_sim_start();
-    env_sim_start();
 
     char payload[32];
     snprintf(payload, sizeof payload, "ACK,INIT,%s", FW_VERSION);
     uart_link_send_frame(payload);
+
+    accel_sim_start();
+    env_sim_start();
 }
 
 void commands_handle_line(const char *line)
