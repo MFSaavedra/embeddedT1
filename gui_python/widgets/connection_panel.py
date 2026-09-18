@@ -3,7 +3,7 @@
 """
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import (QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel,
@@ -82,16 +82,23 @@ class ConnectionPanel(QGroupBox):
         self.init_btn.clicked.connect(self.init_requested)
         self.set_connected(False)
 
-    def set_ports(self, ports: List[str]) -> None:
+    def set_ports(self, ports: List[Tuple[str, str]]) -> None:
         """@brief Repopulate the port list, keeping the current choice if it still exists.
 
-        @param ports  Device names, e.g. from serial_worker.available_ports().
+        The combo shows the label; the device name travels as item data so that
+        connect_requested carries exactly what pyserial must open. The first entry is
+        preselected, which is the first USB adapter when available_ports() found one.
+
+        @param ports  (device, label) pairs in display order, from
+                      serial_worker.available_ports().
         """
-        current = self.port_combo.currentText()
+        current = self.port_combo.currentData()
         self.port_combo.clear()
-        self.port_combo.addItems(ports)
-        if current in ports:
-            self.port_combo.setCurrentText(current)
+        for device, label in ports:
+            self.port_combo.addItem(label, device)
+        index = self.port_combo.findData(current)
+        if index >= 0:
+            self.port_combo.setCurrentIndex(index)
         if not ports:
             self.status_label.setText("No se encontraron puertos")
 
@@ -119,7 +126,7 @@ class ConnectionPanel(QGroupBox):
         if self._connected:
             self.disconnect_requested.emit()
             return
-        port = self.port_combo.currentText()
+        port = self.port_combo.currentData()
         if not port:
             self.status_label.setText("Selecciona un puerto")
             return

@@ -98,3 +98,33 @@ def test_connect_pulses_en_then_waits_for_boot_before_connected(monkeypatch):
     assert ("frame", ["ENV", "23.4", "31"]) in events
     assert ("bad", "ets Jun  8 2016 00:22:57") in events
 
+
+class FakePortInfo:
+    """@brief Minimal stand-in for serial.tools.list_ports_common.ListPortInfo."""
+
+    def __init__(self, device, vid=None, manufacturer=None, product=None, description=None):
+        self.device, self.vid = device, vid
+        self.manufacturer, self.product, self.description = manufacturer, product, description
+
+
+def test_available_ports_lists_usb_adapters_first_with_labels(monkeypatch):
+    fake = [
+        FakePortInfo("/dev/ttyS0", description="ttyS0"),                     # legacy COM port
+        FakePortInfo("/dev/ttyUSB1", vid=0x0403, product="FT232R USB UART", manufacturer="FTDI"),
+        FakePortInfo("/dev/ttyUSB0", vid=0x10C4, manufacturer="Silicon Labs",
+                     product="CP2102 USB to UART Bridge Controller",
+                     description="CP2102 USB to UART Bridge Controller - CP2102 USB to UART Bridge Controller"),
+        FakePortInfo("COM3", vid=0x10C4, manufacturer="Silicon Labs",
+                     description="Silicon Labs CP210x USB to UART Bridge (COM3)"),
+        FakePortInfo("/dev/ttyS1", description="n/a"),
+    ]
+    monkeypatch.setattr(serial_worker.list_ports, "comports", lambda: fake)
+
+    # USB adapters (any VID) first, each group sorted by device name ("/" < "C").
+    assert serial_worker.available_ports() == [
+        ("/dev/ttyUSB0", "/dev/ttyUSB0 — Silicon Labs CP2102 USB to UART Bridge Controller"),
+        ("/dev/ttyUSB1", "/dev/ttyUSB1 — FTDI FT232R USB UART"),
+        ("COM3", "COM3 — Silicon Labs CP210x USB to UART Bridge (COM3)"),
+        ("/dev/ttyS0", "/dev/ttyS0"),
+        ("/dev/ttyS1", "/dev/ttyS1"),
+    ]

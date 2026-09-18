@@ -7,9 +7,10 @@ with a lock so any widget may call send() directly from the GUI thread.
 """
 from __future__ import annotations
 
+import os
 import threading
 import time
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import serial
 from PyQt5.QtCore import QThread, pyqtSignal
@@ -24,12 +25,39 @@ RESET_PULSE_S = 0.1
 BOOT_WAIT_S = 1.0
 
 
-def available_ports() -> List[str]:
-    """@brief Device names of the serial ports currently present.
+def available_ports() -> List[Tuple[str, str]]:
+    """@brief Serial ports currently present, USB-serial adapters first.
 
-    @return Sorted list such as ["/dev/ttyUSB0"] or ["COM3", "COM4"]; empty if none.
+    Legacy motherboard ports (/dev/ttyS0, COM1) open without error and then just swallow
+    everything, so they are listed after any USB adapter: with the ESP32 plugged in, its
+    CP2102 is the preselected entry in the connection panel and its label says so.
+
+    @return (device, label) pairs such as
+            ("/dev/ttyUSB0", "/dev/ttyUSB0 — Silicon Labs CP2102 USB to UART Bridge
+            Controller") or ("/dev/ttyS0", "/dev/ttyS0"); empty if no port is present.
     """
-    return sorted(p.device for p in list_ports.comports())
+    ports = list_ports.comports()
+    usb = sorted((p for p in ports if p.vid is not None), key=lambda p: p.device)
+    other = sorted((p for p in ports if p.vid is None), key=lambda p: p.device)
+    return [(p.device, _port_label(p)) for p in usb + other]
+
+
+def _port_label(info) -> str:
+    """@brief Human-readable combo entry for one port: "<device> — <manufacturer product>".
+
+    Falls back to pyserial's description when the USB product string is missing (Windows)
+    and to the bare device name when even that is uninformative (pyserial reports "ttyS0"
+    or "n/a" for legacy ports).
+
+    @param info  A serial.tools.list_ports_common.ListPortInfo.
+    @return The label; the device name alone if nothing better is known.
+    """
+    what = info.product or info.description or ""
+    if what in ("n/a", os.path.basename(info.device)):
+        what = ""
+    if info.manufacturer and info.manufacturer not in what:
+        what = f"{info.manufacturer} {what}".strip()
+    return f"{info.device} — {what}" if what else info.device
 
 
 class SerialWorker(QThread):

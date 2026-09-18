@@ -90,9 +90,12 @@ Doxygen; `doxygen` desde la raíz del repositorio genera `docs/doxygen/html/inde
 
 ## Uso
 
-1. Conectar el ESP32 por USB, elegir el puerto (`/dev/ttyUSB0`, `COMx`) y el baud rate
-   (921600 por defecto; debe coincidir con `LINK_BAUD` del firmware, que es fijo en tiempo
-   de compilación) y pulsar **Conectar**. La GUI abre el puerto, **reinicia la tarjeta**
+1. Conectar el ESP32 por USB, elegir el puerto y el baud rate. La lista muestra primero
+   los adaptadores USB-serial con su descripción (`/dev/ttyUSB0 — Silicon Labs CP2102…`,
+   `COM3 — …`) y después los puertos heredados de la placa madre (`/dev/ttyS0`, `COM1`),
+   que se abren sin error pero no llevan a ningún lado; el primero de la lista queda
+   preseleccionado. El baud rate es 921600 por defecto y debe coincidir con `LINK_BAUD`
+   del firmware, que es fijo en tiempo de compilación. Pulsar **Conectar**. La GUI abre el puerto, **reinicia la tarjeta**
    (pulso en EN vía RTS, con DTR inactivo para que arranque el firmware) y espera ~1 s a
    que termine de arrancar antes de mostrar "Conectado" y habilitar los controles; las
    líneas del bootloader ROM (a 115200) y los logs de arranque se descartan
@@ -215,5 +218,6 @@ _(agregar en `docs/screenshots/` y enlazar aquí)_
 | `Permission denied: /dev/ttyUSB0` | `sudo usermod -aG dialout $USER` y volver a iniciar sesión |
 | `Device or resource busy` | Otro programa (p. ej. `idf.py monitor`) tiene el puerto abierto |
 | Contador de tramas rechazadas sube al conectar | Normal: salida del bootloader tras el reinicio que hace la GUI al conectar |
-| "Conectado" pero **Inicializar ESP32** no responde (sin `ACK`, sin tramas) | El chip quedó colgado por una conmutación de DTR/RTS fuera de la GUI (p. ej. al cerrar `idf.py monitor`); **Desconectar** y **Conectar** de nuevo lo reinicia. Si persiste, pulsar el botón **EN** de la placa y volver a **Inicializar**; si la GUI avisa "No se pudo reiniciar el ESP32", el adaptador no expone DTR/RTS y hay que usar el botón EN |
+| "Conectado" pero **Inicializar ESP32** no responde y los contadores no se mueven (ni siquiera rechazadas al conectar) | Puerto equivocado: un puerto heredado como `/dev/ttyS0` o `COM1` se abre sin error y no responde nada. Elegir la entrada con la descripción del adaptador USB (CP2102) |
+| "Conectado" a `/dev/ttyUSB0`/`COMx`, rechazadas subió al conectar, pero **Inicializar ESP32** no responde (sin `ACK`, sin tramas) | El chip quedó colgado por una conmutación de DTR/RTS fuera de la GUI (p. ej. al cerrar `idf.py monitor`); **Desconectar** y **Conectar** de nuevo lo reinicia. Si persiste, pulsar el botón **EN** de la placa y volver a **Inicializar**; si la GUI avisa "No se pudo reiniciar el ESP32", el adaptador no expone DTR/RTS y hay que usar el botón EN |
 | Contador de rechazadas sube continuamente | Baud rate distinto entre GUI y firmware, o cable defectuoso |
