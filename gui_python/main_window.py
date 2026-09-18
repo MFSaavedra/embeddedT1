@@ -76,7 +76,8 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self._counter_label)
         self._update_counters()
 
-        # ---- wiring ----
+        # ---- wiring (hidden from Doxygen, which would read each self._callback as an attribute) ----
+        # @cond
         self.connection.refresh_requested.connect(self._refresh_ports)
         self.connection.connect_requested.connect(self._connect)
         self.connection.disconnect_requested.connect(self.worker.close)
@@ -89,6 +90,7 @@ class MainWindow(QMainWindow):
         self.worker.error.connect(self._on_error)
         self.worker.frame_received.connect(self._on_frame)
         self.worker.bad_line.connect(self._on_bad_line)
+        # @endcond
 
         self.config.setEnabled(False)
         self._refresh_ports()

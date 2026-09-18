@@ -75,7 +75,10 @@ class ConnectionPanel(QGroupBox):
         grid.addWidget(self.status_label, 4, 0, 1, 2)
 
         self.refresh_btn.clicked.connect(self.refresh_requested)
+        # Doxygen would read self._on_connect_clicked as an attribute.
+        # @cond
         self.connect_btn.clicked.connect(self._on_connect_clicked)
+        # @endcond
         self.init_btn.clicked.connect(self.init_requested)
         self.set_connected(False)
 

@@ -9,7 +9,7 @@ PROJECT_BRIEF          = "Firmware ESP-IDF + GUI PyQt5"
 OUTPUT_DIRECTORY       = docs/doxygen
 
 # ---- input: firmware (C), GUI (Python) and the README as the main page ----
-INPUT                  = README.md esp32_firmware/main gui_python
+INPUT                  = README.md TODO.md esp32_firmware/main gui_python
 FILE_PATTERNS          = *.c *.h *.py *.md
 RECURSIVE              = YES
 EXCLUDE_PATTERNS       = */__pycache__/* */.pytest_cache/*
@@ -28,4 +28,5 @@ SOURCE_BROWSER         = YES    # link every entity to its highlighted source
 GENERATE_LATEX         = NO
 GENERATE_TREEVIEW      = YES
 QUIET                  = YES
-WARN_NO_PARAMDOC       = YES    # flag functions whose parameters are only partially documented
+WARN_NO_PARAMDOC       = NO     # would demand @return on every Python `-> None` method (not seen as void);
+                                # partial or misnamed @param docs are still flagged by WARN_IF_INCOMPLETE_DOC

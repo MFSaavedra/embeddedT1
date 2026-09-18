@@ -73,7 +73,10 @@ class AccelPlots(QWidget):
 
         ## Periodic redraw, REFRESH_MS.
         self._timer = QTimer(self)
+        # Doxygen would read self._redraw as an attribute.
+        # @cond
         self._timer.timeout.connect(self._redraw)
+        # @endcond
         self._timer.start(REFRESH_MS)
 
     # --------------------------------- inputs ---------------------------------

@@ -74,8 +74,11 @@ class AxisConfigWidget(QGroupBox):
         form.addRow("Amplitud", self.amp_combo)
         form.addRow("Muestreo", self.fs_combo)
 
+        # Doxygen would read self._emit_changed as an attribute.
+        # @cond
         for combo in (self.func_combo, self.amp_combo, self.fs_combo):
             combo.currentIndexChanged.connect(self._emit_changed)
+        # @endcond
 
     def values(self) -> Tuple[int, int, int]:
         """@brief Current selection.
