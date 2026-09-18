@@ -1,3 +1,7 @@
+/**
+ * @file protocol.c
+ * @brief Framing and XOR checksum, see protocol.h. No dependencies beyond libc.
+ */
 #include "protocol.h"
 
 #include <ctype.h>

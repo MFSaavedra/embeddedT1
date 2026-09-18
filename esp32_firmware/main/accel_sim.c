@@ -1,3 +1,12 @@
+/**
+ * @file accel_sim.c
+ * @brief Synthetic accelerometer: waveform evaluation, 1 kHz master tick and ACC streaming.
+ *
+ * Pipeline: on_tick() (esp_timer task, ACCEL_TICK_HZ) decimates per axis and pushes
+ * accel_sample_t items into a queue; stream_task() drains the queue, groups consecutive
+ * samples of each axis into a batch worth about ACCEL_BATCH_MS, and flush_axis() formats
+ * the batch into one ACC frame for uart_link. Public API: accel_sim.h.
+ */
 #include "accel_sim.h"
 #include "app_config.h"
 #include "uart_link.h"
@@ -11,27 +20,31 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 
+/** Log tag of this module. */
 static const char *TAG = "accel_sim";
 
+/** Spec defaults, applied to every axis by accel_sim_reset_defaults(). */
 static const axis_cfg_t DEFAULT_CFG = {
     .func  = ACCEL_DEFAULT_FUNC,
     .amp_g = ACCEL_DEFAULT_AMP_G,
     .fs_hz = ACCEL_DEFAULT_FS_HZ,
 };
 
-static axis_cfg_t        s_cfg[AXIS_COUNT];
-static portMUX_TYPE      s_cfg_lock = portMUX_INITIALIZER_UNLOCKED;
-static esp_timer_handle_t s_tick_timer;
-static QueueHandle_t     s_sample_queue;
-static uint32_t          s_tick;        /* increments at ACCEL_TICK_HZ while running */
-static volatile bool     s_running;
+static axis_cfg_t        s_cfg[AXIS_COUNT];     /**< Live per-axis configuration, guarded by s_cfg_lock */
+static portMUX_TYPE      s_cfg_lock = portMUX_INITIALIZER_UNLOCKED;   /**< Protects s_cfg across tasks */
+static esp_timer_handle_t s_tick_timer;         /**< Periodic ACCEL_TICK_HZ master tick, runs on_tick() */
+static QueueHandle_t     s_sample_queue;        /**< accel_sample_t items, on_tick() -> stream_task() */
+static uint32_t          s_tick;                /**< Master tick count; advances only while running */
+static volatile bool     s_running;             /**< True between accel_sim_start() and accel_sim_stop() */
 
+/** Samples of one axis waiting to be sent as a single ACC frame. */
 typedef struct {
-    float    values[ACCEL_BATCH_MAX];
-    uint32_t t0_ms;
-    int      count;
+    float    values[ACCEL_BATCH_MAX];   /**< Sample values in g, oldest first */
+    uint32_t t0_ms;                     /**< Timestamp of values[0] */
+    int      count;                     /**< Number of valid entries in values */
 } axis_batch_t;
 
+/** Batch being assembled for each axis; only touched from stream_task(). */
 static axis_batch_t s_batch[AXIS_COUNT];
 
 /* --------------------------------- validation --------------------------------- */
@@ -67,8 +80,16 @@ float accel_sim_eval(wave_func_t func, float amp_g, float t_s)
 
 /* ---------------------------- master tick (1 kHz) --------------------------- */
 
-/* Runs in the esp_timer task, NOT in an ISR: normal FreeRTOS calls are allowed, but it
- * must return quickly - never block on the queue or on the UART here. */
+/**
+ * @brief Master tick callback: decimate per axis and queue the new samples.
+ *
+ * Runs in the esp_timer task, NOT in an ISR: normal FreeRTOS calls are allowed, but it
+ * must return quickly - never block on the queue or on the UART here. Time is derived from
+ * the global tick count, so the waveform phase stays continuous across fs changes. If the
+ * queue is full the sample is dropped rather than delaying the timer.
+ *
+ * @param arg  Unused (esp_timer callback argument).
+ */
 static void on_tick(void *arg)
 {
     (void)arg;
@@ -94,6 +115,16 @@ static void on_tick(void *arg)
 
 /* ------------------------------ streaming task ------------------------------- */
 
+/**
+ * @brief Format the pending batch of @p axis as one ACC frame, send it and empty the batch.
+ *
+ *     ACC,<axis>,<t0_ms>,<fs_hz>,<v1>,...,<vN>
+ *
+ * Values are printed with three decimals. A frame longer than LINK_MAX_FRAME is logged and
+ * dropped by uart_link_send_frame(). Does nothing if the batch is empty.
+ *
+ * @param axis  Axis whose batch to flush.
+ */
 static void flush_axis(axis_t axis)
 {
     axis_batch_t *b = &s_batch[axis];
@@ -111,6 +142,15 @@ static void flush_axis(axis_t axis)
     b->count = 0;
 }
 
+/**
+ * @brief Streaming task body: drain the sample queue and emit batched ACC frames.
+ *
+ * Each sample is appended to the batch of its axis; the batch is flushed once it holds
+ * about ACCEL_BATCH_MS worth of samples at the axis' current fs (at least 1, at most
+ * ACCEL_BATCH_MAX). Blocks on the queue while idle. Never returns.
+ *
+ * @param arg  Unused (FreeRTOS task parameter).
+ */
 static void stream_task(void *arg)
 {
     (void)arg;

@@ -1,3 +1,7 @@
+/**
+ * @file uart_link.c
+ * @brief UART0 driver setup, frame TX and the line-oriented RX task, see uart_link.h.
+ */
 #include "uart_link.h"
 #include "app_config.h"
 #include "protocol.h"
@@ -10,8 +14,10 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+/** Log tag of this module. */
 static const char *TAG = "uart_link";
 
+/** Line callback registered by uart_link_start_rx_task(). */
 static uart_line_cb_t s_line_cb;
 
 void uart_link_init(void)
@@ -54,7 +60,15 @@ void uart_link_send_frame(const char *payload)
     uart_link_send_raw(frame, (size_t)n);
 }
 
-/* Reads bytes from the PC, splits on CR/LF and delivers complete lines to the callback. */
+/**
+ * @brief RX task body: read bytes from the PC, split on CR/LF and deliver complete lines.
+ *
+ * Empty lines (e.g. the LF of a CR+LF pair) are skipped. A line that does not fit in
+ * LINK_MAX_LINE is dropped; any bytes that follow are collected as the start of a new line.
+ * Never returns.
+ *
+ * @param arg  Unused (FreeRTOS task parameter).
+ */
 static void rx_task(void *arg)
 {
     (void)arg;

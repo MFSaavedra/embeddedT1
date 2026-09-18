@@ -1,3 +1,9 @@
+/**
+ * @file env_sim.c
+ * @brief Random temperature / humidity readings sent as ENV frames every 30 s or 60 s.
+ *
+ * Public API: env_sim.h.
+ */
 #include "env_sim.h"
 #include "app_config.h"
 #include "uart_link.h"
@@ -8,11 +14,12 @@
 #include "esp_random.h"
 #include "esp_timer.h"
 
+/** Log tag of this module. */
 static const char *TAG = "env_sim";
 
-static esp_timer_handle_t s_timer;
-static uint16_t           s_period_s = ENV_DEFAULT_PERIOD_S;
-static bool               s_running;
+static esp_timer_handle_t s_timer;                              /**< Periodic timer, runs on_period() */
+static uint16_t           s_period_s = ENV_DEFAULT_PERIOD_S;    /**< Current period in seconds (30 or 60) */
+static bool               s_running;                            /**< True between env_sim_start() and env_sim_stop() */
 
 bool env_sim_valid_period(unsigned seconds) { return seconds == 30 || seconds == 60; }
 
@@ -24,8 +31,16 @@ env_reading_t env_sim_read(void)
     return r;
 }
 
-/* esp_timer task context: a short uart_write_bytes() is fine here (it only copies into the
- * driver's TX ring buffer). */
+/**
+ * @brief Timer callback: draw one reading and send it as an ENV frame.
+ *
+ *     ENV,<temp_c>,<hum_pct>
+ *
+ * Runs in the esp_timer task context: a short uart_write_bytes() is fine here (it only
+ * copies into the driver's TX ring buffer). Also called directly by env_sim_start().
+ *
+ * @param arg  Unused (esp_timer callback argument).
+ */
 static void on_period(void *arg)
 {
     (void)arg;

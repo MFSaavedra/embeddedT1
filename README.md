@@ -37,6 +37,7 @@ gui_python/              Aplicación PyQt5
   tests/                 Pruebas unitarias del protocolo (pytest)
   requirements.txt
 docs/                    Enunciado y capturas de pantalla
+Doxyfile                 Configuración de Doxygen (documentación del código, ver más abajo)
 ```
 
 ## Requisitos
@@ -80,6 +81,10 @@ python gui_python/main.py
 ```
 
 Pruebas unitarias del protocolo: `pytest gui_python/tests`
+
+Documentación del código: todo el firmware (C) y la GUI (Python) llevan comentarios
+Doxygen; `doxygen` desde la raíz del repositorio genera `docs/doxygen/html/index.html`
+(directorio ignorado por git).
 
 ## Uso
 

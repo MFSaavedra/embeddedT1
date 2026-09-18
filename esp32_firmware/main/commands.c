@@ -1,3 +1,9 @@
+/**
+ * @file commands.c
+ * @brief Parses GUI commands (CFG / ENV / INIT), applies them and replies ACK / ERR.
+ *
+ * See commands.h for the command set and README.md "Protocolo" for the frame definitions.
+ */
 #include "commands.h"
 #include "accel_sim.h"
 #include "app_config.h"
@@ -11,10 +17,16 @@
 
 #include "esp_log.h"
 
+/** Log tag of this module. */
 static const char *TAG = "commands";
 
+/** Maximum number of comma-separated fields a command may carry (CFG, the longest, uses 5). */
 #define MAX_FIELDS 8
 
+/**
+ * @brief Send an acknowledgement frame: "ACK," followed by @p what.
+ * @param[in] what  Name of the command being acknowledged ("CFG", "ENV").
+ */
 static void send_ack(const char *what)
 {
     char payload[32];
@@ -22,6 +34,10 @@ static void send_ack(const char *what)
     uart_link_send_frame(payload);
 }
 
+/**
+ * @brief Send an error frame: "ERR," followed by @p why.
+ * @param[in] why  Short reason code: "BADFRAME", "EMPTY", "UNKNOWN" or "BADARG".
+ */
 static void send_err(const char *why)
 {
     char payload[32];
@@ -29,7 +45,18 @@ static void send_err(const char *why)
     uart_link_send_frame(payload);
 }
 
-/* $CFG,<axis>,<func>,<amp>,<fs> */
+/**
+ * @brief Handle a CFG command: reconfigure one accelerometer axis.
+ *
+ *     CFG,<X|Y|Z>,<func>,<amp>,<fs>
+ *
+ * Replies ACK,CFG on success, or ERR,BADARG if the field count, the axis letter or any
+ * value is outside the allowed set (accel_sim_set_axis() validates func / amp / fs; a
+ * non-numeric field parses as 0 and is rejected the same way).
+ *
+ * @param[in] fields  Payload fields as split by proto_split(); fields[0] is "CFG".
+ * @param     n       Number of entries in @p fields.
+ */
 static void handle_cfg(char *fields[], int n)
 {
     if (n != 5 || fields[1][0] == '\0' || fields[1][1] != '\0') {
@@ -56,7 +83,16 @@ static void handle_cfg(char *fields[], int n)
     send_ack("CFG");
 }
 
-/* $ENV,<period_s> */
+/**
+ * @brief Handle an ENV command: set the transmission period of the environmental sensor.
+ *
+ *     ENV,<30|60>
+ *
+ * Replies ACK,ENV on success, or ERR,BADARG if the field count or the period is not allowed.
+ *
+ * @param[in] fields  Payload fields as split by proto_split(); fields[0] is "ENV".
+ * @param     n       Number of entries in @p fields.
+ */
 static void handle_env(char *fields[], int n)
 {
     if (n != 2) {
@@ -71,7 +107,18 @@ static void handle_env(char *fields[], int n)
     send_ack("ENV");
 }
 
-/* $INIT */
+/**
+ * @brief Handle an INIT command: restore the spec defaults and (re)start streaming.
+ *
+ *     INIT
+ *
+ * Resets the three axes and the environmental period to the app_config.h defaults, starts
+ * both simulators (no-op if already running) and replies ACK,INIT,FW_VERSION. Streaming
+ * starts only here, never at boot.
+ *
+ * @param fields  Unused.
+ * @param n       Unused.
+ */
 static void handle_init(char *fields[], int n)
 {
     (void)fields;
