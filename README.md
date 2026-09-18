@@ -92,9 +92,11 @@ Doxygen; `doxygen` desde la raíz del repositorio genera `docs/doxygen/html/inde
 
 1. Conectar el ESP32 por USB, elegir el puerto (`/dev/ttyUSB0`, `COMx`) y el baud rate
    (921600 por defecto; debe coincidir con `LINK_BAUD` del firmware, que es fijo en tiempo
-   de compilación) y pulsar **Conectar**. Al abrir el puerto la tarjeta se reinicia (señal
-   DTR); las primeras líneas del bootloader ROM llegan a 115200 y se descartan
-   automáticamente (el contador de tramas rechazadas sube unas pocas unidades).
+   de compilación) y pulsar **Conectar**. La GUI abre el puerto, **reinicia la tarjeta**
+   (pulso en EN vía RTS, con DTR inactivo para que arranque el firmware) y espera ~1 s a
+   que termine de arrancar antes de mostrar "Conectado" y habilitar los controles; las
+   líneas del bootloader ROM (a 115200) y los logs de arranque se descartan
+   automáticamente (el contador de tramas rechazadas sube unas decenas).
 2. Pulsar **Inicializar ESP32**: el firmware vuelve a los valores por defecto del enunciado
    (armónica simple, 4 g, 100 Hz, ambiental cada 30 s) y responde con `ACK`.
 3. Cambiar función / amplitud / frecuencia de muestreo de cada eje: el cambio se envía de
@@ -183,6 +185,17 @@ el enlace (ver *Decisiones de diseño*).
   `accel_sim_start()`/`env_sim_start()`). La GUI también espera este `$ACK,INIT` antes de
   reiniciar su propio panel a los valores por defecto, en vez de asumir éxito al enviar el
   comando (`main_window.py`).
+- **Reinicio explícito al conectar.** Abrir el puerto ya conmuta DTR/RTS y, a través del
+  circuito de auto-reset de la tarjeta, suele reiniciar el ESP32; pero el orden y la
+  duración con que el sistema operativo conmuta esas líneas no están controlados y en Linux
+  con el puente CP2102 dejaban al chip **colgado** (mudo y sin responder a `$INIT`) en la
+  mayoría de las conexiones (medido: 1–4 conexiones útiles de cada 10, igual con la versión
+  a 115200). Por eso `SerialWorker` aplica tras abrir el puerto la misma secuencia que
+  `esptool` para un *hard reset* — DTR inactivo (IO0 alto, arranque normal y no el modo de
+  descarga), RTS activo 100 ms (EN bajo), RTS inactivo — y solo emite `connected` tras
+  `BOOT_WAIT_S = 1 s`, con lo que **Inicializar ESP32** no puede enviarse a un chip que aún
+  arranca (10 de 10 conexiones útiles). Como el streaming solo empieza con `$INIT`, el
+  reinicio no pierde nada.
 - **Consola compartida.** UART0 transporta datos y logs; los logs no empiezan con `$` y se
   descartan en la GUI y en el parser (`proto_parse`). Ver `TODO.md` ítem **FW6** para la
   política de logs pendiente de definir antes de la demo.
@@ -201,5 +214,6 @@ _(agregar en `docs/screenshots/` y enlazar aquí)_
 |---|---|
 | `Permission denied: /dev/ttyUSB0` | `sudo usermod -aG dialout $USER` y volver a iniciar sesión |
 | `Device or resource busy` | Otro programa (p. ej. `idf.py monitor`) tiene el puerto abierto |
-| Contador de tramas rechazadas sube al conectar | Normal: salida del bootloader tras el reinicio por DTR |
+| Contador de tramas rechazadas sube al conectar | Normal: salida del bootloader tras el reinicio que hace la GUI al conectar |
+| "Conectado" pero **Inicializar ESP32** no responde (sin `ACK`, sin tramas) | El chip quedó colgado por una conmutación de DTR/RTS fuera de la GUI (p. ej. al cerrar `idf.py monitor`); **Desconectar** y **Conectar** de nuevo lo reinicia. Si persiste, pulsar el botón **EN** de la placa y volver a **Inicializar**; si la GUI avisa "No se pudo reiniciar el ESP32", el adaptador no expone DTR/RTS y hay que usar el botón EN |
 | Contador de rechazadas sube continuamente | Baud rate distinto entre GUI y firmware, o cable defectuoso |

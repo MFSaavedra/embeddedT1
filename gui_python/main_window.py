@@ -104,13 +104,17 @@ class MainWindow(QMainWindow):
     def _connect(self, port: str, baud: int) -> None:
         """@brief Ask the worker to open @p port at @p baud (result arrives via signals).
 
+        The worker resets the board and waits for it to boot before emitting connected,
+        so the panel shows an intermediate message for about a second.
+
         @param port  Device name chosen in the connection panel.
         @param baud  Baud rate chosen in the connection panel.
         """
-        self.worker.open(port, baud)
+        if self.worker.open(port, baud):
+            self.connection.set_connected(False, f"Conectando a {port}… (reiniciando ESP32)")
 
     def _on_connected(self, port: str, baud: int) -> None:
-        """@brief Port opened: enable the controls and clear stale data from the last session.
+        """@brief Port open and board rebooted: enable the controls and clear stale data.
 
         @param port  Device name that was opened.
         @param baud  Baud rate in use.
