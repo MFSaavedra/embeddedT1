@@ -7,7 +7,9 @@ tri-axial y un sensor de temperatura/humedad, y los transmite por UART (USB-seri
 aplicación de escritorio en Python/PyQt que grafica las señales y reconfigura el
 microcontrolador en vivo.
 
-**Integrantes:** _(nombre 1)_, _(nombre 2)_, _(nombre 3)_
+**Integrantes:** 
+Joaquín Acosta, 
+Matías Saavedra
 
 > Enunciado completo: [`docs/Tarea1_CC5328_v2.pdf`](docs/Tarea1_CC5328_v2.pdf).
 > Estado del trabajo y decisiones pendientes: [`TODO.md`](TODO.md).
