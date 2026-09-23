@@ -13,9 +13,9 @@ from PyQt5.QtWidgets import (QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLa
 ## Must match uart_link_valid_baud() in esp32_firmware/main/uart_link.c, which decides
 ## which rates a BAUD command may switch the link to.
 BAUD_RATES = [115200, 230400, 460800, 921600]
-## Speed used to open the port; the board always boots at its compile-time LINK_BAUD, so
-## keep this in sync with LINK_BAUD in esp32_firmware/main/app_config.h. Changing the
-## selector while connected renegotiates the link instead (baud_change_requested).
+## Speed the port is always opened at: the board boots into its compile-time LINK_BAUD and
+## the GUI resets it on every connect, so no other rate can work for the first byte. Keep in
+## sync with LINK_BAUD in esp32_firmware/main/app_config.h.
 DEFAULT_BAUD = 921600
 
 
@@ -24,6 +24,12 @@ class ConnectionPanel(QGroupBox):
 
     The panel only emits requests; MainWindow performs them and reports back through
     set_ports() and set_connected().
+
+    The baud selector means one thing in both states: the speed the *link* should run at.
+    It is never the speed the port is opened at - that is always DEFAULT_BAUD, because the
+    board boots into its compile-time rate. Picking another rate while connected
+    renegotiates (baud_change_requested); picking one while disconnected is remembered and
+    MainWindow renegotiates as soon as the connection is up.
     """
 
     ## User pressed Conectar: (port, baud).
@@ -34,7 +40,7 @@ class ConnectionPanel(QGroupBox):
     init_requested = pyqtSignal()
     ## User pressed the refresh button next to the port list.
     refresh_requested = pyqtSignal()
-    ## User picked another baud rate *while connected*: renegotiate the link.
+    ## User picked another baud rate while connected: renegotiate the link now.
     baud_change_requested = pyqtSignal(int)
 
     def __init__(self, parent=None):
@@ -45,6 +51,9 @@ class ConnectionPanel(QGroupBox):
         super().__init__("Conexión serial", parent)
         ## Mirrors the last set_connected() call; decides what the connect button does.
         self._connected = False
+        ## True while a renegotiation is in flight (set_busy()); locks what must not be
+        ## touched mid-switch.
+        self._busy = False
 
         ## Serial port selector, filled by set_ports().
         self.port_combo = QComboBox()
@@ -113,21 +122,49 @@ class ConnectionPanel(QGroupBox):
         """@brief Reflect the connection state: button labels, enabled widgets, status text.
 
         While connected the port and refresh controls are locked and Inicializar is enabled;
-        while disconnected the opposite. The baud selector stays usable either way, see
-        set_baud_enabled().
+        while disconnected the opposite. What set_busy() locks stays locked either way.
 
         @param connected  True if a port is open.
         @param text       Status text; defaults to "Conectado" / "Desconectado".
         """
         self._connected = connected
-        self.connect_btn.setText("Desconectar" if connected else "Conectar")
-        self.init_btn.setEnabled(connected)
-        for w in (self.port_combo, self.refresh_btn):
-            w.setEnabled(not connected)
-        # The baud selector is usable in both states (with different meanings) and is left
-        # alone here: only set_baud_enabled() touches it, so a lock held during a
-        # renegotiation survives the status updates made while it is in flight.
+        self._apply_enabled_state()
         self.status_label.setText(text or ("Conectado" if connected else "Desconectado"))
+
+    def set_busy(self, busy: bool) -> None:
+        """@brief Lock the controls that must not be used mid-renegotiation.
+
+        Both the baud selector (a second switch while one is in flight) and Inicializar (an
+        INIT written at the old speed while the firmware has already left it) would land in
+        the middle of the changeover.
+
+        @param busy  True between the BAUD command and its outcome.
+        """
+        self._busy = busy
+        self._apply_enabled_state()
+
+    def _apply_enabled_state(self) -> None:
+        """@brief Single place that decides which controls are usable.
+
+        Both the connection state and the busy flag feed into it, so neither can silently
+        undo the other - set_connected() used to re-enable what a renegotiation had locked.
+        """
+        self.connect_btn.setText("Desconectar" if self._connected else "Conectar")
+        self.connect_btn.setEnabled(not self._busy)
+        self.init_btn.setEnabled(self._connected and not self._busy)
+        self.baud_combo.setEnabled(not self._busy)
+        for w in (self.port_combo, self.refresh_btn):
+            w.setEnabled(not self._connected and not self._busy)
+
+    def target_baud(self) -> int:
+        """@brief Speed the user wants the link to run at.
+
+        Read by MainWindow right after connecting: the port is open at DEFAULT_BAUD and is
+        renegotiated to this value if it differs.
+
+        @return The selected rate, one of BAUD_RATES.
+        """
+        return self.baud_combo.currentData()
 
     def set_baud(self, baud: int) -> None:
         """@brief Show @p baud on the selector without emitting baud_change_requested.
@@ -144,19 +181,12 @@ class ConnectionPanel(QGroupBox):
         self.baud_combo.setCurrentIndex(index)
         self.baud_combo.blockSignals(False)
 
-    def set_baud_enabled(self, enabled: bool) -> None:
-        """@brief Lock the baud selector while a renegotiation is in flight.
-
-        @param enabled  False between the BAUD command and its outcome.
-        """
-        self.baud_combo.setEnabled(enabled)
-
     def _on_baud_changed(self, _index: int) -> None:
-        """@brief Slot for the baud selector: renegotiate, or just remember the rate.
+        """@brief Slot for the baud selector: renegotiate now, or leave it to the connect.
 
-        While disconnected the new value is simply the rate the port will be opened at, so
-        nothing is emitted. While connected it is a request to change the speed of a link
-        that is already running, which only the firmware can grant.
+        While connected this is a request to change the speed of a running link, which only
+        the firmware can grant. While disconnected there is nothing to renegotiate yet, so
+        the value is simply left for target_baud() to be read at connect time.
 
         @param _index  New combo index (unused; currentData() is read instead).
         """
@@ -166,7 +196,9 @@ class ConnectionPanel(QGroupBox):
     def _on_connect_clicked(self) -> None:
         """@brief Emit disconnect_requested or connect_requested depending on the state.
 
-        Does nothing (beyond a hint in the status label) if no port is selected.
+        The requested speed is always DEFAULT_BAUD; see _on_baud_changed() for what the baud
+        selector does instead. Does nothing (beyond a hint in the status label) if no port is
+        selected.
         """
         if self._connected:
             self.disconnect_requested.emit()
@@ -175,4 +207,7 @@ class ConnectionPanel(QGroupBox):
         if not port:
             self.status_label.setText("Selecciona un puerto")
             return
-        self.connect_requested.emit(port, self.baud_combo.currentData())
+        # Always DEFAULT_BAUD, never the selector: the board has just been reset and boots
+        # into its compile-time rate. A different selection is honoured by renegotiating
+        # once the link is up (MainWindow._on_connected -> target_baud()).
+        self.connect_requested.emit(port, DEFAULT_BAUD)

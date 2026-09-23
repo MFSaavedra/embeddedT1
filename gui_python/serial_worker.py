@@ -136,7 +136,11 @@ class SerialWorker(QThread):
     def close(self) -> None:
         """@brief Stop the read loop and close the port.
 
-        Blocks up to 2 s for the thread to finish. Safe to call when not connected.
+        Blocks up to 2 s for the thread to finish, then closes the port whether or not it
+        did: readline() can sit on a byte stream that never yields a newline (the board
+        talking at another speed), so the wait is bounded and the reader is written to
+        tolerate having the port closed under it (see _pump_line()). Safe to call when not
+        connected.
         """
         self._stop.set()
         if self.isRunning():
@@ -193,21 +197,32 @@ class SerialWorker(QThread):
         """
         ser = self._ser
         try:
-            self._reset_board(ser)
-            boot_deadline = time.monotonic() + BOOT_WAIT_S
-            while not self._stop.is_set() and time.monotonic() < boot_deadline:
-                if not self._pump_line(ser):
-                    return
-            if self._stop.is_set():
-                return
-            self.connected.emit(ser.port, ser.baudrate)
-            while not self._stop.is_set():
-                if not self._pump_line(ser):
-                    return
-                self._apply_pending_baud(ser)
+            self._run_until_stopped(ser)
+        except Exception as exc:        # noqa: BLE001 - the contract is that run() never raises
+            self.error.emit(f"Error interno del hilo serial: {exc}")
         finally:
             self._close_port()
             self.disconnected.emit()
+
+    def _run_until_stopped(self, ser: serial.Serial) -> None:
+        """@brief Body of run(): reset, wait for boot, then read until stopped.
+
+        Split out so run() can be a single try/finally that lets nothing escape.
+
+        @param ser  The open port.
+        """
+        self._reset_board(ser)
+        boot_deadline = time.monotonic() + BOOT_WAIT_S
+        while not self._stop.is_set() and time.monotonic() < boot_deadline:
+            if not self._pump_line(ser):
+                return
+        if self._stop.is_set():
+            return
+        self.connected.emit(ser.port, ser.baudrate)
+        while not self._stop.is_set():
+            if not self._pump_line(ser):
+                return
+            self._apply_pending_baud(ser)
 
     def _reset_board(self, ser: serial.Serial) -> None:
         """@brief Pulse EN low through the dev board's DTR/RTS auto-reset circuit.
@@ -239,8 +254,12 @@ class SerialWorker(QThread):
         """
         try:
             raw = ser.readline()            # b"" on timeout
-        except (serial.SerialException, OSError) as exc:
+        except Exception as exc:            # noqa: BLE001 - see below
             # Typical cause: the cable was unplugged. TODO(PY1): reconnect policy.
+            # Deliberately broad: a port that dies mid-read does not only raise
+            # SerialException. Observed on a real CP2102 when close() closed the port
+            # while this thread was inside readline(): pyserial then calls os.read() with
+            # a None file descriptor and raises TypeError, which used to escape run().
             self.error.emit(f"Conexión perdida: {exc}")
             return False
         if raw:

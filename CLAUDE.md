@@ -78,8 +78,8 @@ only the direction tells them apart (`CMD_ENV == MSG_ENV` in `protocol.py`).
 Paired constants that must be changed together:
 - `LINK_BAUD` (`app_config.h`) ↔ `DEFAULT_BAUD` (`widgets/connection_panel.py`) ↔
   `CONFIG_ESP_CONSOLE_UART_BAUDRATE` (`sdkconfig.defaults`). All are 921600. This is the
-  *boot* speed, which the GUI must open the port at; the selector only renegotiates once
-  connected (see below).
+  *boot* speed: the GUI always opens the port at `DEFAULT_BAUD` regardless of the selector,
+  because the board reboots into `LINK_BAUD` on every connect.
 - `BAUD_RATES` (`widgets/connection_panel.py`) ↔ `uart_link_valid_baud()` (`uart_link.c`):
   the rates a `$BAUD` command may switch to.
 - `ACCEL_DEFAULT_*` / `ENV_DEFAULT_PERIOD_S` (`app_config.h`) ↔ `DEFAULT_*` in
@@ -138,9 +138,16 @@ SerialWorker(QThread).run() readline ──▶ frame_received / bad_line signals
   which confirms the rate and restarts streaming. Both ends auto-revert if the other goes
   silent (`LINK_BAUD_REVERT_MS` 5 s < `BAUD_NEGOTIATION_MS` 8 s — keep that order). The
   state machine lives in `main_window.py` "baud renegotiation"; `serial_worker.py` still
-  knows no message types. `_on_disconnected` puts the selector back to `DEFAULT_BAUD`: the
-  board reboots into `LINK_BAUD`, so reconnecting at a negotiated rate gives a connection
-  that looks fine and receives nothing.
+  knows no message types.
+- The baud selector means one thing only: the speed the link should run at. It is never the
+  speed the port is opened at (that is always `DEFAULT_BAUD`); a selection made while
+  disconnected is applied by `_on_connected` renegotiating. Making it the opening speed was
+  tried and shipped a footgun: a fresh connect at the selected rate reports "Conectado" and
+  receives nothing, because the board has just rebooted into `LINK_BAUD`.
+- `ConnectionPanel._apply_enabled_state()` is the only place that enables/disables controls,
+  fed by `_connected` and `_busy` (`set_busy()` during a renegotiation). Do not call
+  `setEnabled` from elsewhere: `set_connected()` used to re-enable what a renegotiation had
+  locked, which let an `INIT` be sent mid-switch.
 - `MainWindow` resets the config panel/plots on receipt of `$ACK,INIT`, not when INIT is
   sent. The "tramas OK / rechazadas" counters are kept mutually exclusive: a frame with a
   valid checksum but unparsable fields is moved from OK to rejected.

@@ -21,7 +21,7 @@ import protocol
 from serial_worker import SerialWorker, available_ports
 from widgets.accel_plots import AccelPlots
 from widgets.config_panel import ConfigPanel
-from widgets.connection_panel import DEFAULT_BAUD, ConnectionPanel
+from widgets.connection_panel import ConnectionPanel
 from widgets.env_panel import EnvPanel
 
 ## How long to wait for a baud renegotiation to complete before giving up, ms. Must exceed
@@ -126,7 +126,8 @@ class MainWindow(QMainWindow):
         so the panel shows an intermediate message for about a second.
 
         @param port  Device name chosen in the connection panel.
-        @param baud  Baud rate chosen in the connection panel.
+        @param baud  Speed to open at, always the boot speed (see ConnectionPanel); a
+                     different selection is applied afterwards by _on_connected().
         """
         if self.worker.open(port, baud):
             self.connection.set_connected(False, f"Conectando a {port}… (reiniciando ESP32)")
@@ -134,29 +135,33 @@ class MainWindow(QMainWindow):
     def _on_connected(self, port: str, baud: int) -> None:
         """@brief Port open and board rebooted: enable the controls and clear stale data.
 
+        The port was opened at the board's boot speed. If the user asked for a different one
+        - before connecting, or during an earlier session - the link is renegotiated now, so
+        the selector means the same thing whenever it is touched.
+
         @param port  Device name that was opened.
-        @param baud  Baud rate in use.
+        @param baud  Baud rate the port was opened at.
         """
         self._baud = baud
         self.connection.set_connected(True, f"Conectado a {port} @ {baud}")
         self.config.setEnabled(True)
         self.plots.clear()
         self.env.clear()
+        target = self.connection.target_baud()
+        if target != baud:
+            self._request_baud_change(target)
 
     def _on_disconnected(self) -> None:
         """@brief Port closed (by the user or by an error): disable the controls.
 
-        A renegotiated speed dies with the connection: the board reboots into its
-        compile-time LINK_BAUD (the GUI pulses EN on every connect, and the ROM bootloader
-        is not configurable anyway), so the selector goes back to the speed the next open
-        has to use. Leaving it where the user last put it would open the port at a rate the
-        board is not talking at, which looks like a successful but mute connection.
+        The selector keeps whatever the user chose: it is a preference, not the speed the
+        port is opened at, so the next connect opens at the boot speed and renegotiates back
+        to it by itself.
         """
         self._baud_timer.stop()
         self._baud_pending = None
         self._baud = 0
-        self.connection.set_baud_enabled(True)
-        self.connection.set_baud(DEFAULT_BAUD)
+        self.connection.set_busy(False)
         self.connection.set_connected(False)
         self.config.setEnabled(False)
 
@@ -215,7 +220,7 @@ class MainWindow(QMainWindow):
         if baud == self._baud:
             return
         self._baud_pending = baud
-        self.connection.set_baud_enabled(False)
+        self.connection.set_busy(True)
         self.connection.set_connected(True, f"Cambiando a {baud} baud…")
         if not self.worker.send(f"{protocol.CMD_BAUD},{baud}"):
             self._abort_baud_change("No se pudo enviar el cambio de velocidad")
@@ -240,7 +245,7 @@ class MainWindow(QMainWindow):
         self._baud = self._baud_pending or self._baud
         self._baud_pending = None
         self._baud_timer.stop()
-        self.connection.set_baud_enabled(True)
+        self.connection.set_busy(False)
         self.connection.set_connected(True, f"Conectado a {self._port_name()} @ {self._baud}")
 
     def _abort_baud_change(self, why: str) -> None:
@@ -258,7 +263,7 @@ class MainWindow(QMainWindow):
         self._baud_pending = None
         self.worker.request_baud(self._baud)
         self.connection.set_baud(self._baud)
-        self.connection.set_baud_enabled(True)
+        self.connection.set_busy(False)
         self.connection.set_connected(True, f"Conectado a {self._port_name()} @ {self._baud}")
         self.statusBar().showMessage(
             f"{why}: se volvió a {self._baud} baud. "

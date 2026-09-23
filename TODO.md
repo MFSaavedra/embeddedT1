@@ -94,8 +94,9 @@ Item IDs (`P1`, `FW2`, `PY4`, …) match the `TODO(...)` comments in the code �
 
 - [ ] Error cases to demo on purpose: wrong port, port busy (`idf.py monitor` open), cable
       unplugged while streaming, reconnect, corrupt frame (type garbage in the monitor),
-      baud mismatch (open the port at the wrong rate while disconnected → rejected-frame
-      counter climbs), failed renegotiation (both ends revert by themselves)
+      failed renegotiation (both ends revert by themselves — the GUI can no longer open the
+      port at the wrong rate on purpose, since the selector renegotiates instead; a genuine
+      baud mismatch now needs a firmware built with a different LINK_BAUD)
 - [ ] Soak test: 10+ minutes at 3 × 1000 Hz with no dropped frames, no GUI lag, stable memory
 - [ ] **DOC1** README: fill *Integrantes*, final protocol table, design decisions, screenshots
       in `docs/screenshots/`, usage examples; keep build/run commands accurate

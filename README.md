@@ -94,8 +94,10 @@ Doxygen; `doxygen` desde la raíz del repositorio genera `docs/doxygen/html/inde
    los adaptadores USB-serial con su descripción (`/dev/ttyUSB0 — Silicon Labs CP2102…`,
    `COM3 — …`) y después los puertos heredados de la placa madre (`/dev/ttyS0`, `COM1`),
    que se abren sin error pero no llevan a ningún lado; el primero de la lista queda
-   preseleccionado. El baud rate es 921600 por defecto y debe coincidir con `LINK_BAUD`
-   del firmware, que es fijo en tiempo de compilación. Pulsar **Conectar**. La GUI abre el puerto, **reinicia la tarjeta**
+   preseleccionado. El selector de baud rate indica **la velocidad a la que se quiere que
+   funcione el enlace**, no la de apertura: el puerto se abre siempre a 921600 (la placa
+   arranca a `LINK_BAUD`) y, si se eligió otra, la GUI la renegocia en cuanto la conexión
+   está lista. Pulsar **Conectar**. La GUI abre el puerto, **reinicia la tarjeta**
    (pulso en EN vía RTS, con DTR inactivo para que arranque el firmware) y espera ~1 s a
    que termine de arrancar antes de mostrar "Conectado" y habilitar los controles; las
    líneas del bootloader ROM (a 115200) y los logs de arranque se descartan
@@ -176,13 +178,14 @@ el enlace (ver *Decisiones de diseño*).
   `on_tick()` descarta muestras, de modo que las tramas contienen muestras no consecutivas
   etiquetadas como consecutivas (forma de onda distorsionada). Por eso el enlace se fija en
   **921600 baud** en ambos extremos (`LINK_BAUD` en el firmware, `DEFAULT_BAUD` en la GUI;
-  el puente USB-serial CP2102 de la tarjeta lo soporta). El selector de baud de la GUI debe
-  coincidir con el valor compilado en el firmware: no lo cambia. Si aun así se descartan
+  el puente USB-serial CP2102 de la tarjeta lo soporta); el selector de la GUI permite
+  bajarla en caliente (ver *Cambio de velocidad en caliente*), no subirla más allá. Si aun así se descartan
   muestras, el firmware lo avisa en el monitor (`samples dropped so far: link saturated`) y
   la GUI lo muestra como una tasa medida menor que la configurada.
 - **Cambio de velocidad en caliente.** El selector de baud de la GUI no podía cambiar la
   velocidad del firmware (fijada en compilación por `LINK_BAUD`): elegir otro valor solo
-  desincronizaba los extremos. Ahora, estando conectado, el selector envía `$BAUD,<baud>`.
+  desincronizaba los extremos. Ahora el selector significa una sola cosa —la velocidad a la
+  que debe funcionar el enlace— y la GUI envía `$BAUD,<baud>` para conseguirla.
   Los dos extremos no pueden conmutar en el mismo instante, así que conmutan **en orden**:
   el firmware detiene el streaming, responde `$ACK,BAUD,<baud>` *a la velocidad antigua*,
   espera a que el buffer de transmisión se vacíe (`uart_wait_tx_done()`, si no la respuesta
@@ -195,14 +198,18 @@ el enlace (ver *Decisiones de diseño*).
   `LINK_BAUD_REVERT_MS` = 5 s y vuelve a `LINK_BAUD` si no recibe ninguna trama válida
   (`uart_link_confirm_baud()`), y la GUI hace lo mismo a los 8 s. Sin esa reversión, elegir
   una velocidad que el puente USB-serial no pueda sostener dejaría la placa muda hasta
-  apretar EN. El arranque siempre ocurre a `LINK_BAUD` (el bootloader ROM ni siquiera es
-  configurable), y la GUI reinicia la placa al conectar, así que la conexión **siempre** se
-  abre a 921600 y la renegociación es posterior: el selector, estando desconectado, solo
-  elige la velocidad de apertura y debe coincidir con `LINK_BAUD`. Por lo mismo, al
-  desconectar la GUI devuelve el selector a `DEFAULT_BAUD`: mantener la velocidad
-  renegociada haría que la siguiente conexión abriera el puerto a una velocidad a la que la
-  placa (ya reiniciada) no habla, con el resultado de una conexión aparentemente correcta
-  pero muda.
+  apretar EN.
+
+  El arranque siempre ocurre a `LINK_BAUD` (el bootloader ROM ni siquiera es configurable) y
+  la GUI reinicia la placa al conectar, así que **el puerto se abre siempre a `DEFAULT_BAUD`
+  y la renegociación es posterior**, aunque el selector muestre otra velocidad: elegir 230400
+  estando desconectado y pulsar **Conectar** abre a 921600, renegocia a 230400 y recién
+  entonces habilita los controles. La primera versión de esta función usaba el selector como
+  velocidad de apertura, y elegir otra antes de conectar daba una conexión que decía
+  "Conectado" y no recibía nada (la placa, recién reiniciada, hablaba a 921600); por eso el
+  selector ya no decide cómo se abre el puerto. Mientras la renegociación está en curso, el
+  selector y **Inicializar ESP32** quedan deshabilitados, porque un `$INIT` escrito a la
+  velocidad vieja caería en medio del cambio.
 - **Muestreo por eje.** Un tick maestro de 1 kHz (`esp_timer`, `on_tick()` en
   `accel_sim.c`) del que cada eje toma una muestra cada `1000/fs` ticks (decimación,
   divisores 1/2/5/10/20); el tiempo global `t = tick/1000` mantiene la fase continua al
