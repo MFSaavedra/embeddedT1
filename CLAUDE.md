@@ -138,7 +138,9 @@ SerialWorker(QThread).run() readline ──▶ frame_received / bad_line signals
   which confirms the rate and restarts streaming. Both ends auto-revert if the other goes
   silent (`LINK_BAUD_REVERT_MS` 5 s < `BAUD_NEGOTIATION_MS` 8 s — keep that order). The
   state machine lives in `main_window.py` "baud renegotiation"; `serial_worker.py` still
-  knows no message types.
+  knows no message types. `_on_disconnected` puts the selector back to `DEFAULT_BAUD`: the
+  board reboots into `LINK_BAUD`, so reconnecting at a negotiated rate gives a connection
+  that looks fine and receives nothing.
 - `MainWindow` resets the config panel/plots on receipt of `$ACK,INIT`, not when INIT is
   sent. The "tramas OK / rechazadas" counters are kept mutually exclusive: a frame with a
   valid checksum but unparsable fields is moved from OK to rejected.

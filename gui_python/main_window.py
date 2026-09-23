@@ -21,7 +21,7 @@ import protocol
 from serial_worker import SerialWorker, available_ports
 from widgets.accel_plots import AccelPlots
 from widgets.config_panel import ConfigPanel
-from widgets.connection_panel import ConnectionPanel
+from widgets.connection_panel import DEFAULT_BAUD, ConnectionPanel
 from widgets.env_panel import EnvPanel
 
 ## How long to wait for a baud renegotiation to complete before giving up, ms. Must exceed
@@ -144,10 +144,19 @@ class MainWindow(QMainWindow):
         self.env.clear()
 
     def _on_disconnected(self) -> None:
-        """@brief Port closed (by the user or by an error): disable the controls."""
+        """@brief Port closed (by the user or by an error): disable the controls.
+
+        A renegotiated speed dies with the connection: the board reboots into its
+        compile-time LINK_BAUD (the GUI pulses EN on every connect, and the ROM bootloader
+        is not configurable anyway), so the selector goes back to the speed the next open
+        has to use. Leaving it where the user last put it would open the port at a rate the
+        board is not talking at, which looks like a successful but mute connection.
+        """
         self._baud_timer.stop()
         self._baud_pending = None
+        self._baud = 0
         self.connection.set_baud_enabled(True)
+        self.connection.set_baud(DEFAULT_BAUD)
         self.connection.set_connected(False)
         self.config.setEnabled(False)
 

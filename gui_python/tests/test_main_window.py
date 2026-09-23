@@ -9,6 +9,7 @@ import pytest
 from PyQt5.QtCore import QObject, pyqtSignal
 
 import main_window as mw
+import widgets.connection_panel as cp
 
 
 class StubWorker(QObject):
@@ -105,6 +106,26 @@ def test_err_aborts_without_waiting_for_the_timeout(window):
     assert window._baud_pending is None
     assert window.connection.baud_combo.currentData() == 921600
     assert not window._baud_timer.isActive()
+
+
+def test_disconnect_restores_the_boot_speed(window):
+    """@brief A renegotiated speed must not survive the connection.
+
+    The board reboots into LINK_BAUD on the next connect (the GUI pulses EN), so a selector
+    still showing the negotiated rate would open the port at a speed nothing is talking at:
+    the GUI would report a healthy connection and receive nothing.
+    """
+    _pick_baud(window, 230400)
+    window._on_frame(["ACK", "BAUD", "230400"])
+    window._on_baud_changed(230400)
+    window._on_frame(["ACK", "INIT", "1.0"])
+    assert window._baud == 230400
+
+    window._on_disconnected()
+
+    assert window.connection.baud_combo.currentData() == cp.DEFAULT_BAUD
+    assert window._baud == 0
+    assert window.worker.sent[-1] != "BAUD,921600"   # restoring the selector sends nothing
 
 
 def test_reselecting_the_current_speed_sends_nothing(window):

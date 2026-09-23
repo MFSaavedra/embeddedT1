@@ -108,7 +108,9 @@ Doxygen; `doxygen` desde la raíz del repositorio genera `docs/doxygen/html/inde
 5. Cambiar el baud rate **estando conectado** renegocia el enlace: la GUI envía `$BAUD`, el
    ESP32 responde a la velocidad antigua y luego conmuta, la GUI conmuta al recibir esa
    respuesta y envía `$INIT` para confirmar (ver *Decisiones de diseño*). Si algo falla,
-   ambos extremos vuelven solos a 921600 en unos segundos y la GUI lo avisa.
+   ambos extremos vuelven solos a 921600 en unos segundos y la GUI lo avisa. Al
+   **desconectar**, el selector vuelve a 921600: la placa arranca siempre a `LINK_BAUD`, así
+   que abrir el puerto a la velocidad renegociada daría una conexión muda.
 
 La barra de estado muestra las respuestas del ESP32 y un contador de tramas válidas y
 rechazadas (checksum incorrecto o líneas que no son tramas), útil para verificar la
@@ -196,7 +198,11 @@ el enlace (ver *Decisiones de diseño*).
   apretar EN. El arranque siempre ocurre a `LINK_BAUD` (el bootloader ROM ni siquiera es
   configurable), y la GUI reinicia la placa al conectar, así que la conexión **siempre** se
   abre a 921600 y la renegociación es posterior: el selector, estando desconectado, solo
-  elige la velocidad de apertura y debe coincidir con `LINK_BAUD`.
+  elige la velocidad de apertura y debe coincidir con `LINK_BAUD`. Por lo mismo, al
+  desconectar la GUI devuelve el selector a `DEFAULT_BAUD`: mantener la velocidad
+  renegociada haría que la siguiente conexión abriera el puerto a una velocidad a la que la
+  placa (ya reiniciada) no habla, con el resultado de una conexión aparentemente correcta
+  pero muda.
 - **Muestreo por eje.** Un tick maestro de 1 kHz (`esp_timer`, `on_tick()` en
   `accel_sim.c`) del que cada eje toma una muestra cada `1000/fs` ticks (decimación,
   divisores 1/2/5/10/20); el tiempo global `t = tick/1000` mantiene la fase continua al
