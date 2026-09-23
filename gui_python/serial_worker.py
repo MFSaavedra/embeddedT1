@@ -4,6 +4,10 @@
 SerialWorker owns the pyserial port. Its read loop runs in a QThread and talks to the GUI
 only through Qt signals (thread-safe, delivered on the GUI thread). Writes are serialised
 with a lock so any widget may call send() directly from the GUI thread.
+
+Anything that reconfigures the port instead of writing to it - request_baud() - is queued
+and applied by the read loop between two reads, because the loop is normally blocked inside
+readline() and reconfiguring underneath it corrupts that read.
 """
 from __future__ import annotations
 
@@ -23,6 +27,9 @@ RESET_PULSE_S = 0.1
 ## Seconds given to the board after the reset pulse to reach app_main() before `connected`
 ## is emitted. Boot takes ~0.3 s including the ROM/bootloader logs; 1 s leaves margin.
 BOOT_WAIT_S = 1.0
+## Seconds waited before switching speed, so the board can finish emitting (at the old
+## speed) whatever was queued behind the ACK that authorised the switch.
+BAUD_SETTLE_S = 0.05
 
 
 def available_ports() -> List[Tuple[str, str]]:
@@ -66,7 +73,7 @@ class SerialWorker(QThread):
     Lifecycle: open() starts run() in the background, which first resets the board (see
     _reset_board()), waits BOOT_WAIT_S for it to boot and emits connected, then emits
     frame_received / bad_line for every line until close() is called or the port fails.
-    send() may be called from any thread while the port is open.
+    send() and request_baud() may be called from any thread while the port is open.
     """
 
     ## Fields of a valid frame, e.g. ["ENV", "23.4", "31"] (see protocol.parse_frame()).
@@ -78,6 +85,8 @@ class SerialWorker(QThread):
     connected = pyqtSignal(str, int)
     ## Emitted when the read loop ends, whether by close() or by an I/O error.
     disconnected = pyqtSignal()
+    ## The port is now running at this speed, after a request_baud() took effect.
+    baud_changed = pyqtSignal(int)
     ## Human-readable message for the status bar.
     error = pyqtSignal(str)
 
@@ -93,6 +102,10 @@ class SerialWorker(QThread):
         self._write_lock = threading.Lock()
         ## Set by close() so run() exits at the next read timeout.
         self._stop = threading.Event()
+        ## Speed requested by request_baud(), applied by the read loop; None when idle.
+        self._pending_baud: Optional[int] = None
+        ## Guards _pending_baud between the GUI thread and the read loop.
+        self._baud_lock = threading.Lock()
 
     # ------------------------------------------------------------ GUI-thread API
 
@@ -129,6 +142,22 @@ class SerialWorker(QThread):
         if self.isRunning():
             self.wait(2000)
         self._close_port()
+
+    def request_baud(self, baud: int) -> None:
+        """@brief Ask the read loop to switch the open port to @p baud.
+
+        The switch is deferred instead of applied here: run() is normally blocked inside
+        readline(), and reconfiguring the port under it would corrupt that read. The loop
+        picks the request up within one read timeout (0.1 s) and emits baud_changed once
+        the port is running at the new speed.
+
+        Only the PC side changes. The firmware must have been told separately (BAUD
+        command) and must already have switched, which is what its ACK means.
+
+        @param baud  New speed; must be one the firmware accepts.
+        """
+        with self._baud_lock:
+            self._pending_baud = baud
 
     def send(self, payload: str) -> bool:
         """@brief Frame and transmit a command payload.
@@ -175,6 +204,7 @@ class SerialWorker(QThread):
             while not self._stop.is_set():
                 if not self._pump_line(ser):
                     return
+                self._apply_pending_baud(ser)
         finally:
             self._close_port()
             self.disconnected.emit()
@@ -221,6 +251,32 @@ class SerialWorker(QThread):
             else:
                 self.frame_received.emit(fields)
         return True
+
+    def _apply_pending_baud(self, ser: serial.Serial) -> None:
+        """@brief Apply a request_baud() if one is pending (called between reads).
+
+        Waits BAUD_SETTLE_S first so the board can finish sending, at the old speed, the log
+        line that trails the ACK, then drops those bytes: whatever is in the input buffer at
+        this point was clocked in at a speed that no longer applies.
+
+        A failure is reported but is not fatal: the port keeps its previous speed, which is
+        also the speed the firmware falls back to when no frame reaches it (LINK_BAUD_REVERT_MS),
+        so the link repairs itself instead of dying.
+
+        @param ser  The open port.
+        """
+        with self._baud_lock:
+            baud, self._pending_baud = self._pending_baud, None
+        if baud is None or baud == ser.baudrate:
+            return
+        time.sleep(BAUD_SETTLE_S)
+        try:
+            ser.reset_input_buffer()
+            ser.baudrate = baud
+        except (serial.SerialException, OSError, ValueError) as exc:
+            self.error.emit(f"No se pudo cambiar a {baud} baud: {exc}")
+            return
+        self.baud_changed.emit(baud)
 
     def _close_port(self) -> None:
         """@brief Close and forget the port, swallowing any error from a dead device."""

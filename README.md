@@ -105,6 +105,10 @@ Doxygen; `doxygen` desde la raíz del repositorio genera `docs/doxygen/html/inde
 3. Cambiar función / amplitud / frecuencia de muestreo de cada eje: el cambio se envía de
    inmediato y se refleja en el gráfico correspondiente.
 4. Elegir el periodo del sensor ambiental (30 s / 60 s).
+5. Cambiar el baud rate **estando conectado** renegocia el enlace: la GUI envía `$BAUD`, el
+   ESP32 responde a la velocidad antigua y luego conmuta, la GUI conmuta al recibir esa
+   respuesta y envía `$INIT` para confirmar (ver *Decisiones de diseño*). Si algo falla,
+   ambos extremos vuelven solos a 921600 en unos segundos y la GUI lo avisa.
 
 La barra de estado muestra las respuestas del ESP32 y un contador de tramas válidas y
 rechazadas (checksum incorrecto o líneas que no son tramas), útil para verificar la
@@ -132,9 +136,14 @@ $<payload>*<XX>\n
 | Configurar eje | `$CFG,<eje>,<func>,<amp>,<fs>*XX` — eje `X`/`Y`/`Z`, func `1..3`, amp `4`/`8`/`16`, fs `50`/`100`/`200`/`500`/`1000` | `$ACK,CFG*XX` o `$ERR,BADARG*XX` |
 | Periodo ambiental | `$ENV,<segundos>*XX` — `30` o `60` | `$ACK,ENV*XX` o `$ERR,BADARG*XX` |
 | Inicializar | `$INIT*XX` — valores por defecto y (re)inicio del streaming | `$ACK,INIT,<versión>*XX` |
+| Cambiar velocidad | `$BAUD,<baud>*XX` — `115200`/`230400`/`460800`/`921600` | `$ACK,BAUD,<baud>*XX` (a la velocidad **anterior**) o `$ERR,BADARG*XX` |
 
 Errores posibles: `BADFRAME` (formato/checksum), `EMPTY`, `UNKNOWN` (tipo desconocido),
 `BADARG` (valor fuera de las opciones permitidas), `NOTIMPL` (comando aún no implementado).
+
+`$BAUD` es el único comando cuya respuesta viaja a una velocidad distinta de la que tendrá
+el enlace inmediatamente después; los detalles y la reversión automática están en
+*Decisiones de diseño*.
 
 ### ESP32 → PC (datos)
 
@@ -169,6 +178,25 @@ el enlace (ver *Decisiones de diseño*).
   coincidir con el valor compilado en el firmware: no lo cambia. Si aun así se descartan
   muestras, el firmware lo avisa en el monitor (`samples dropped so far: link saturated`) y
   la GUI lo muestra como una tasa medida menor que la configurada.
+- **Cambio de velocidad en caliente.** El selector de baud de la GUI no podía cambiar la
+  velocidad del firmware (fijada en compilación por `LINK_BAUD`): elegir otro valor solo
+  desincronizaba los extremos. Ahora, estando conectado, el selector envía `$BAUD,<baud>`.
+  Los dos extremos no pueden conmutar en el mismo instante, así que conmutan **en orden**:
+  el firmware detiene el streaming, responde `$ACK,BAUD,<baud>` *a la velocidad antigua*,
+  espera a que el buffer de transmisión se vacíe (`uart_wait_tx_done()`, si no la respuesta
+  saldría partida en dos velocidades) y recién entonces llama a `uart_set_baudrate()`; la GUI
+  conmuta al recibir esa respuesta y manda `$INIT`, que confirma la velocidad y reanuda el
+  streaming. Como `uart_vfs_dev_use_driver()` enruta `ESP_LOG` por el mismo driver, los logs
+  siguen la nueva velocidad automáticamente.
+
+  La velocidad nueva es **provisional**: el firmware arma un temporizador de
+  `LINK_BAUD_REVERT_MS` = 5 s y vuelve a `LINK_BAUD` si no recibe ninguna trama válida
+  (`uart_link_confirm_baud()`), y la GUI hace lo mismo a los 8 s. Sin esa reversión, elegir
+  una velocidad que el puente USB-serial no pueda sostener dejaría la placa muda hasta
+  apretar EN. El arranque siempre ocurre a `LINK_BAUD` (el bootloader ROM ni siquiera es
+  configurable), y la GUI reinicia la placa al conectar, así que la conexión **siempre** se
+  abre a 921600 y la renegociación es posterior: el selector, estando desconectado, solo
+  elige la velocidad de apertura y debe coincidir con `LINK_BAUD`.
 - **Muestreo por eje.** Un tick maestro de 1 kHz (`esp_timer`, `on_tick()` en
   `accel_sim.c`) del que cada eje toma una muestra cada `1000/fs` ticks (decimación,
   divisores 1/2/5/10/20); el tiempo global `t = tick/1000` mantiene la fase continua al
@@ -221,3 +249,5 @@ _(agregar en `docs/screenshots/` y enlazar aquí)_
 | "Conectado" pero **Inicializar ESP32** no responde y los contadores no se mueven (ni siquiera rechazadas al conectar) | Puerto equivocado: un puerto heredado como `/dev/ttyS0` o `COM1` se abre sin error y no responde nada. Elegir la entrada con la descripción del adaptador USB (CP2102) |
 | "Conectado" a `/dev/ttyUSB0`/`COMx`, rechazadas subió al conectar, pero **Inicializar ESP32** no responde (sin `ACK`, sin tramas) | El chip quedó colgado por una conmutación de DTR/RTS fuera de la GUI (p. ej. al cerrar `idf.py monitor`); **Desconectar** y **Conectar** de nuevo lo reinicia. Si persiste, pulsar el botón **EN** de la placa y volver a **Inicializar**; si la GUI avisa "No se pudo reiniciar el ESP32", el adaptador no expone DTR/RTS y hay que usar el botón EN |
 | Contador de rechazadas sube continuamente | Baud rate distinto entre GUI y firmware, o cable defectuoso |
+| "El ESP32 no respondió al cambio de velocidad" | El puente USB-serial no sostiene esa velocidad. Ambos extremos ya volvieron a 921600; pulsar **Inicializar ESP32** para reanudar el streaming |
+| Tras cambiar la velocidad, `idf.py monitor` muestra basura | El monitor sigue fijo en `CONFIG_ESP_CONSOLE_UART_BAUDRATE`; abrirlo con `idf.py monitor -b <baud>` |

@@ -1,5 +1,6 @@
 """@file test_serial_worker.py
-@brief SerialWorker connect sequence against a fake port: EN reset pulse, boot wait, ordering.
+@brief SerialWorker against a fake port: connect sequence (EN pulse, boot wait) and the
+deferred baud switch.
 
 No hardware and no Qt event loop: the signals are connected with Qt.DirectConnection so
 PyQt calls the callables straight from the worker thread instead of queueing them.
@@ -29,12 +30,27 @@ class FakePort:
     instances = []
 
     def __init__(self, port, baudrate, timeout):
-        self.port, self.baudrate, self.timeout = port, baudrate, timeout
+        self.port, self.timeout = port, timeout
+        self._baudrate = baudrate
         self.is_open = True
         ## (line, value) pairs in the order the worker set them.
         self.modem_events = []
+        ## (what, thread ident) for every baudrate write and input flush, in order.
+        self.baud_events = []
         self._lines = list(BOOT_LINES)
         FakePort.instances.append(self)
+
+    @property
+    def baudrate(self):
+        return self._baudrate
+
+    @baudrate.setter
+    def baudrate(self, value):
+        self._baudrate = value
+        self.baud_events.append((value, threading.get_ident()))
+
+    def reset_input_buffer(self):
+        self.baud_events.append(("reset", threading.get_ident()))
 
     @property
     def dtr(self):
@@ -97,6 +113,64 @@ def test_connect_pulses_en_then_waits_for_boot_before_connected(monkeypatch):
     assert ("connected", "FAKE", 921600) in events
     assert ("frame", ["ENV", "23.4", "31"]) in events
     assert ("bad", "ets Jun  8 2016 00:22:57") in events
+
+
+def test_request_baud_is_applied_by_the_read_loop_not_the_caller(monkeypatch):
+    """@brief request_baud() defers the switch to the reader thread.
+
+    Reconfiguring the port from the GUI thread would corrupt the readline() that the worker
+    is blocked in, so the switch must happen in run(), between reads, after the input
+    buffered at the old speed has been dropped.
+    """
+    monkeypatch.setattr(serial, "Serial", FakePort)
+    monkeypatch.setattr(serial_worker, "RESET_PULSE_S", 0.01)
+    monkeypatch.setattr(serial_worker, "BOOT_WAIT_S", 0.1)
+    monkeypatch.setattr(serial_worker, "BAUD_SETTLE_S", 0.01)
+    FakePort.instances.clear()
+
+    connected = threading.Event()
+    switched = threading.Event()
+    seen = []
+    worker = SerialWorker()
+    direct = Qt.DirectConnection
+    worker.connected.connect(lambda *_: connected.set(), direct)
+    worker.baud_changed.connect(lambda b: (seen.append(b), switched.set()), direct)
+    worker.error.connect(lambda msg: seen.append(("error", msg)), direct)
+
+    assert worker.open("FAKE", 921600)
+    assert connected.wait(2.0)
+    port = FakePort.instances[0]
+    assert port.baud_events == []          # opening the port must not reconfigure it
+
+    worker.request_baud(230400)
+    assert switched.wait(2.0), seen
+    worker.close()
+
+    assert seen == [230400]
+    # Input flushed first, then the divisor changed - both from the worker thread.
+    assert [what for what, _ in port.baud_events] == ["reset", 230400]
+    assert all(ident != threading.get_ident() for _, ident in port.baud_events)
+    assert port.baudrate == 230400
+
+
+def test_request_baud_to_the_current_speed_is_a_noop(monkeypatch):
+    """@brief A redundant request must not touch the port (it would flush good input)."""
+    monkeypatch.setattr(serial, "Serial", FakePort)
+    monkeypatch.setattr(serial_worker, "RESET_PULSE_S", 0.01)
+    monkeypatch.setattr(serial_worker, "BOOT_WAIT_S", 0.1)
+    FakePort.instances.clear()
+
+    connected = threading.Event()
+    worker = SerialWorker()
+    worker.connected.connect(lambda *_: connected.set(), Qt.DirectConnection)
+    assert worker.open("FAKE", 921600)
+    assert connected.wait(2.0)
+
+    worker.request_baud(921600)
+    time.sleep(0.3)
+    worker.close()
+
+    assert FakePort.instances[0].baud_events == []
 
 
 class FakePortInfo:

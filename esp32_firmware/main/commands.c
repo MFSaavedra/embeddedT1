@@ -140,6 +140,50 @@ static void handle_env(char *fields[], int n)
 }
 
 /**
+ * @brief Handle a BAUD command: change the speed of the link itself.
+ *
+ *     BAUD,<115200|230400|460800|921600>
+ *
+ * Streaming is stopped first: an ACC frame still sitting in the TX buffer would otherwise be
+ * shifted out half at the old rate and half at the new one. The ACK is sent *before* the
+ * switch so the PC receives it at the rate it is still listening at, and doubles as its cue
+ * to switch; uart_link_set_baud() then drains the buffer and reprograms the divisor.
+ *
+ * The new rate is provisional until a frame arrives at it (commands_handle_line() confirms),
+ * so a rate the PC cannot drive costs LINK_BAUD_REVERT_MS, not a trip to the reset button.
+ * The PC is expected to send INIT once it has switched, which both confirms the rate and
+ * restarts the streaming stopped here.
+ *
+ * Replies ACK,BAUD,<baud> on success, or ERR,BADARG for a bad field count or a rate outside
+ * the allowed set.
+ *
+ * @param[in] fields  Payload fields as split by proto_split(); fields[0] is "BAUD".
+ * @param     n       Number of entries in @p fields.
+ */
+static void handle_baud(char *fields[], int n)
+{
+    long baud;
+    if (n != 2 || !parse_field(fields[1], 0, 1000000, &baud) ||
+        !uart_link_valid_baud((unsigned)baud)) {
+        send_err("BADARG");
+        return;
+    }
+
+    accel_sim_stop();
+    env_sim_stop();
+
+    char payload[32];
+    snprintf(payload, sizeof payload, "ACK,BAUD,%ld", baud);
+    uart_link_send_frame(payload);
+
+    if (!uart_link_set_baud((unsigned)baud)) {
+        /* Still at the old rate: the PC will switch anyway on the ACK it has just been
+         * sent, stop hearing us, and fall back by itself. Nothing better to report. */
+        ESP_LOGE(TAG, "could not switch to %ld baud", baud);
+    }
+}
+
+/**
  * @brief Handle an INIT command: restore the spec defaults and (re)start streaming.
  *
  *     INIT
@@ -186,12 +230,18 @@ void commands_handle_line(const char *line)
         return;
     }
 
+    /* A frame that passed the checksum proves the PC is talking at the current rate, so a
+     * link speed set by a recent BAUD command is now confirmed (no-op otherwise). */
+    uart_link_confirm_baud();
+
     if (strcmp(fields[0], "CFG") == 0) {
         handle_cfg(fields, n);
     } else if (strcmp(fields[0], "ENV") == 0) {
         handle_env(fields, n);
     } else if (strcmp(fields[0], "INIT") == 0) {
         handle_init(fields, n);
+    } else if (strcmp(fields[0], "BAUD") == 0) {
+        handle_baud(fields, n);
     } else {
         send_err("UNKNOWN");
     }

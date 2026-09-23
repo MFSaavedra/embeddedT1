@@ -30,6 +30,8 @@ CMD_CFG = "CFG"
 CMD_ENV = "ENV"
 ## PC -> ESP32: reset to defaults and (re)start streaming.
 CMD_INIT = "INIT"
+## PC -> ESP32: change the speed of the link itself (answered at the *old* speed).
+CMD_BAUD = "BAUD"
 
 
 def checksum(payload: str) -> int:

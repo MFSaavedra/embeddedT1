@@ -53,6 +53,13 @@ Item IDs (`P1`, `FW2`, `PY4`, …) match the `TODO(...)` comments in the code �
       reconfigure`** (sdkconfig is generated and git-ignored). Console policy: keep
       `ESP_LOG` at INFO (log lines never start with `$`); `CONFIG_LOG_DEFAULT_LEVEL_NONE=y`
       remains an option for the demo
+- [x] **FW7** Runtime baud renegotiation: `$BAUD,<baud>` → `$ACK,BAUD` at the old rate,
+      `uart_wait_tx_done()` + `uart_set_baudrate()` in `uart_link_set_baud()`, streaming
+      stopped across the switch and restarted by the `$INIT` that confirms it. Both ends
+      fall back on their own (`LINK_BAUD_REVERT_MS` = 5 s firmware, `BAUD_NEGOTIATION_MS`
+      = 8 s GUI), so a rate the USB bridge cannot sustain costs a few seconds instead of a
+      trip to the EN button. Makes the GUI's baud selector do something other than break
+      the link; not needed for bandwidth (921600 is at 31 % worst case)
 - [x] Tested each step with `idf.py monitor` before touching the GUI (FW1–FW5 confirmed
       working end to end)
 - [x] `f`, `f₁`, `f₂` kept at `app_config.h` defaults: 2 / 0.5 / 5 Hz (documented in README)
@@ -87,7 +94,8 @@ Item IDs (`P1`, `FW2`, `PY4`, …) match the `TODO(...)` comments in the code �
 
 - [ ] Error cases to demo on purpose: wrong port, port busy (`idf.py monitor` open), cable
       unplugged while streaming, reconnect, corrupt frame (type garbage in the monitor),
-      baud mismatch (rejected-frame counter climbs)
+      baud mismatch (open the port at the wrong rate while disconnected → rejected-frame
+      counter climbs), failed renegotiation (both ends revert by themselves)
 - [ ] Soak test: 10+ minutes at 3 × 1000 Hz with no dropped frames, no GUI lag, stable memory
 - [ ] **DOC1** README: fill *Integrantes*, final protocol table, design decisions, screenshots
       in `docs/screenshots/`, usage examples; keep build/run commands accurate

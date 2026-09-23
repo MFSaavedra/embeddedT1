@@ -9,6 +9,7 @@
  */
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 
 /**
@@ -57,3 +58,38 @@ void uart_link_send_raw(const char *data, size_t len);
  *            fit in LINK_MAX_LINE are discarded.
  */
 void uart_link_start_rx_task(uart_line_cb_t cb);
+
+/**
+ * @brief Check that @p baud is one of the rates the GUI offers.
+ * @param baud  Raw value from a BAUD command.
+ * @return true if @p baud is 115200, 230400, 460800 or 921600.
+ */
+bool uart_link_valid_baud(unsigned baud);
+
+/**
+ * @brief Change the link speed, after everything already queued has left the wire.
+ *
+ * Call this *after* sending the frame that tells the PC to switch: the pending TX buffer
+ * is drained first (uart_wait_tx_done()), so that frame still goes out at the old rate and
+ * the PC has something to synchronise on. Bytes clocked in during the changeover are
+ * garbage and are discarded.
+ *
+ * The new rate is provisional: a timer is armed for LINK_BAUD_REVERT_MS and the rate falls
+ * back to LINK_BAUD unless uart_link_confirm_baud() is called before it expires. Without
+ * that, selecting a rate the PC cannot drive would leave the board mute until it is reset
+ * by hand.
+ *
+ * @param baud  New rate; must satisfy uart_link_valid_baud().
+ * @return true if the driver accepted the new rate (the revert timer is then armed).
+ *
+ * @note Call from a task, never from a timer or ISR: it blocks while the TX buffer drains.
+ */
+bool uart_link_set_baud(unsigned baud);
+
+/**
+ * @brief Confirm the current link speed and cancel the pending revert.
+ *
+ * Called by the command layer for every frame that passes the checksum: a readable frame at
+ * the new rate proves both ends agree. A no-op when no switch is pending.
+ */
+void uart_link_confirm_baud(void);

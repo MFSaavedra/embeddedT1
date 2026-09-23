@@ -11,6 +11,7 @@
 #include "driver/uart.h"
 #include "driver/uart_vfs.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -19,6 +20,11 @@ static const char *TAG = "uart_link";
 
 /** Line callback registered by uart_link_start_rx_task(). */
 static uart_line_cb_t s_line_cb;
+
+/** One-shot timer that undoes an unconfirmed uart_link_set_baud(), created on first use. */
+static esp_timer_handle_t s_revert_timer;
+/** True between uart_link_set_baud() and uart_link_confirm_baud() (or the revert). */
+static volatile bool s_revert_armed;
 
 void uart_link_init(void)
 {
@@ -40,6 +46,77 @@ void uart_link_init(void)
     uart_vfs_dev_use_driver(LINK_UART_NUM);
 
     ESP_LOGI(TAG, "UART%d ready at %d baud", (int)LINK_UART_NUM, LINK_BAUD);
+}
+
+bool uart_link_valid_baud(unsigned baud)
+{
+    return baud == 115200 || baud == 230400 || baud == 460800 || baud == 921600;
+}
+
+/**
+ * @brief Revert timer callback: nobody talked to us at the new rate, so go back.
+ *
+ * Runs in the esp_timer task. The warning goes out at LINK_BAUD, i.e. at the rate a GUI
+ * that also gave up and reverted is listening at, so it is readable when it matters.
+ *
+ * @param arg  Unused (esp_timer callback argument).
+ */
+static void on_revert(void *arg)
+{
+    (void)arg;
+    s_revert_armed = false;
+    /* No ESP_ERROR_CHECK here: this is the recovery path. A timeout draining a TX buffer
+     * nobody is reading must not turn a bad baud rate into a panic. */
+    uart_wait_tx_done(LINK_UART_NUM, pdMS_TO_TICKS(200));
+    uart_set_baudrate(LINK_UART_NUM, LINK_BAUD);
+    uart_flush_input(LINK_UART_NUM);
+    ESP_LOGW(TAG, "no frame received at the new rate, reverted to %d baud", LINK_BAUD);
+}
+
+bool uart_link_set_baud(unsigned baud)
+{
+    if (!uart_link_valid_baud(baud)) {
+        return false;
+    }
+    if (s_revert_timer == NULL) {
+        const esp_timer_create_args_t args = {
+            .callback        = on_revert,
+            .arg             = NULL,
+            .dispatch_method = ESP_TIMER_TASK,
+            .name            = "baud_revert",
+        };
+        ESP_ERROR_CHECK(esp_timer_create(&args, &s_revert_timer));
+    }
+    if (s_revert_armed) {                  /* a second switch before the first was confirmed */
+        esp_timer_stop(s_revert_timer);
+        s_revert_armed = false;
+    }
+
+    /* Everything already queued - the ACK that tells the PC to switch, and any log line
+     * ahead of it - must reach the wire at the OLD rate before the divisor changes. */
+    ESP_LOGI(TAG, "switching link to %u baud (provisional)", baud);
+    if (uart_wait_tx_done(LINK_UART_NUM, pdMS_TO_TICKS(200)) != ESP_OK ||
+        uart_set_baudrate(LINK_UART_NUM, baud) != ESP_OK) {
+        return false;
+    }
+    uart_flush_input(LINK_UART_NUM);       /* bytes clocked in mid-switch are garbage */
+
+    s_revert_armed = true;
+    ESP_ERROR_CHECK(esp_timer_start_once(s_revert_timer, (uint64_t)LINK_BAUD_REVERT_MS * 1000ULL));
+    return true;
+}
+
+void uart_link_confirm_baud(void)
+{
+    if (!s_revert_armed) {
+        return;
+    }
+    s_revert_armed = false;
+    /* Unchecked on purpose: the revert timer may have fired between the test above and
+     * here (RX task vs. esp_timer task), and stopping an expired timer is not an error
+     * worth panicking over - the rate is back to LINK_BAUD either way. */
+    esp_timer_stop(s_revert_timer);
+    ESP_LOGI(TAG, "link speed confirmed by the PC");
 }
 
 void uart_link_send_raw(const char *data, size_t len)

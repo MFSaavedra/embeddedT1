@@ -24,6 +24,10 @@
 #define LINK_TX_BUF_SIZE    4096        /**< Driver TX ring buffer, bytes (frames are copied into it). */
 #define LINK_MAX_LINE       128         /**< Longest accepted command line (PC -> ESP32), bytes. */
 #define LINK_MAX_FRAME      512         /**< Longest frame we build (ESP32 -> PC), incl. '$', checksum and newline. */
+#define LINK_BAUD_REVERT_MS 5000        /**< After a BAUD switch, revert to LINK_BAUD unless a valid frame
+                                         *   arrives within this time: a rate the PC cannot actually drive
+                                         *   would otherwise mute the board until someone presses EN.
+                                         *   The GUI's own fallback must be longer than this. */
 /** @} */
 
 /**
