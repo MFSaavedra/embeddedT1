@@ -86,7 +86,7 @@ Pruebas unitarias del protocolo: `pytest gui_python/tests`
 
 Documentación del código: todo el firmware (C) y la GUI (Python) llevan comentarios
 Doxygen; `doxygen` desde la raíz del repositorio genera `docs/doxygen/html/index.html`
-(directorio ignorado por git).
+(incluido en el repositorio; se abre directamente en el navegador).
 
 ## Uso
 
