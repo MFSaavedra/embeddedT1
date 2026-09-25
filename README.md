@@ -12,7 +12,6 @@ Joaquín Acosta,
 Matías Saavedra
 
 > Enunciado completo: [`docs/Tarea1_CC5328_v2.pdf`](docs/Tarea1_CC5328_v2.pdf).
-> Estado del trabajo y decisiones pendientes: [`TODO.md`](TODO.md).
 
 ## Estructura del repositorio
 
