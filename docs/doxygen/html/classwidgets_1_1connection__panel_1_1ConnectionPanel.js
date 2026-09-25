@@ -1,0 +1,25 @@
+var classwidgets_1_1connection__panel_1_1ConnectionPanel =
+[
+    [ "__init__", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#a42a3c3bb29311f80fd81f28543940578", null ],
+    [ "_apply_enabled_state", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#a9b9efa550c6638ef696ddb999e457f6b", null ],
+    [ "_on_baud_changed", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#a50c11e0bd98fa691e078ec5890eb1313", null ],
+    [ "_on_connect_clicked", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#a9496e5f474ef3e29426ffc180eac75bc", null ],
+    [ "set_baud", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#a08d94a985e39f081f62f839cf4cd1002", null ],
+    [ "set_busy", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#ae060e77f953c56c26a46f95a929b21b6", null ],
+    [ "set_connected", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#adbe39780f588012d124602a4476c5cc1", null ],
+    [ "set_ports", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#a3b79753645c6c323d196d088d1292ebe", null ],
+    [ "target_baud", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#a4110c2feba500dd6fdb01b6836377e9f", null ],
+    [ "_busy", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#af7a57bdf81736cb6ebf4145b1884c6f1", null ],
+    [ "_connected", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#a42b8a060848244e8d0369d2a10bfc814", null ],
+    [ "baud_change_requested", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#aeb329ee85ad4f6c191376c180e124ad1", null ],
+    [ "baud_combo", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#a3dc60e6a02b0286199399071d5988fc8", null ],
+    [ "connect_btn", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#aa8cdac484629b5f16c64d5c128fff882", null ],
+    [ "connect_requested", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#ad54b8bc4ccf6b625b9677fd7952f5c9c", null ],
+    [ "disconnect_requested", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#af7402e8820d63060b6415eb7df7cc4eb", null ],
+    [ "init_btn", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#aab1dd6e7388c1b407101d2469f999fd3", null ],
+    [ "init_requested", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#aa57c23efd0c8468c0a24aa798fea57b7", null ],
+    [ "port_combo", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#a5519cdcca90d0f925aceee033a29232d", null ],
+    [ "refresh_btn", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#a60ea3e0a2568838a461f83184e6e7183", null ],
+    [ "refresh_requested", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#a9cfab23f9f19cfb347c7d05b9770fff6", null ],
+    [ "status_label", "classwidgets_1_1connection__panel_1_1ConnectionPanel.html#a3e9cb57b1093dec6330fe1e8f0458126", null ]
+];

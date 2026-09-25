@@ -154,7 +154,7 @@ static void handle_env(char *fields[], int n)
  * The PC is expected to send INIT once it has switched, which both confirms the rate and
  * restarts the streaming stopped here.
  *
- * Replies ACK,BAUD,<baud> on success, or ERR,BADARG for a bad field count or a rate outside
+ * Replies `ACK,BAUD,<baud>` on success, or ERR,BADARG for a bad field count or a rate outside
  * the allowed set.
  *
  * @param[in] fields  Payload fields as split by proto_split(); fields[0] is "BAUD".

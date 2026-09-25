@@ -1,0 +1,25 @@
+var searchData=
+[
+  ['daq_0',['TODO — Tarea 1 CC5328 (ESP32 ↔ PyQt serial DAQ)',['../md_TODO.html',1,'']]],
+  ['datos_1',['ESP32 → PC (datos)',['../index.html#autotoc_md8',1,'']]],
+  ['de_20comunicación_2',['Protocolo de comunicación',['../index.html#autotoc_md6',1,'']]],
+  ['de_20diseño_3',['Decisiones de diseño',['../index.html#autotoc_md9',1,'']]],
+  ['de_20la_20aplicación_4',['Ejecución de la aplicación',['../index.html#autotoc_md4',1,'']]],
+  ['de_20pantalla_5',['Capturas de pantalla',['../index.html#autotoc_md10',1,'']]],
+  ['de_20problemas_6',['Solución de problemas',['../index.html#autotoc_md11',1,'']]],
+  ['decide_20as_20a_20team_20—_20resolved_7',['Open questions (ask the auxiliar / decide as a team) — resolved',['../md_TODO.html#autotoc_md25',1,'']]],
+  ['decisiones_20de_20diseño_8',['Decisiones de diseño',['../index.html#autotoc_md9',1,'']]],
+  ['decisions_20traps_20the_20pdf_20does_20not_20spell_20out_9',['Design decisions &amp;amp; traps the PDF does not spell out',['../md_TODO.html#autotoc_md24',1,'']]],
+  ['del_20firmware_10',['Compilación y carga del firmware',['../index.html#autotoc_md3',1,'']]],
+  ['del_20repositorio_11',['Estructura del repositorio',['../index.html#autotoc_md1',1,'']]],
+  ['demo_20—_20standing_20by_12',['5. Hardening, docs, demo (1.2 pts + most of the 60 % demo) — standing by',['../md_TODO.html#autotoc_md19',1,'']]],
+  ['demo_201_202_20pts_20most_20of_20the_2060_20demo_20—_20standing_20by_13',['5. Hardening, docs, demo (1.2 pts + most of the 60 % demo) — standing by',['../md_TODO.html#autotoc_md19',1,'']]],
+  ['depend_20on_20it_20and_20it_20is_20worth_200_206_20on_20its_20own_20✅_14',['1. Protocol (do this first — both sides depend on it, and it is worth 0.6 on its own) ✅',['../md_TODO.html#autotoc_md15',1,'']]],
+  ['design_20decisions_20traps_20the_20pdf_20does_20not_20spell_20out_15',['Design decisions &amp;amp; traps the PDF does not spell out',['../md_TODO.html#autotoc_md24',1,'']]],
+  ['diseño_16',['Decisiones de diseño',['../index.html#autotoc_md9',1,'']]],
+  ['do_20☐_17',['0. Setup (done ✅ / to do ☐)',['../md_TODO.html#autotoc_md14',1,'']]],
+  ['do_20this_20first_20—_20both_20sides_20depend_20on_20it_20and_20it_20is_20worth_200_206_20on_20its_20own_20✅_18',['1. Protocol (do this first — both sides depend on it, and it is worth 0.6 on its own) ✅',['../md_TODO.html#autotoc_md15',1,'']]],
+  ['docs_20demo_201_202_20pts_20most_20of_20the_2060_20demo_20—_20standing_20by_19',['5. Hardening, docs, demo (1.2 pts + most of the 60 % demo) — standing by',['../md_TODO.html#autotoc_md19',1,'']]],
+  ['does_20not_20spell_20out_20',['Design decisions &amp;amp; traps the PDF does not spell out',['../md_TODO.html#autotoc_md24',1,'']]],
+  ['done_20✅_20to_20do_20☐_21',['0. Setup (done ✅ / to do ☐)',['../md_TODO.html#autotoc_md14',1,'']]]
+];

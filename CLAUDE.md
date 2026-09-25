@@ -53,8 +53,9 @@ Qt event loop: monkeypatch `serial.Serial` with a fake port and connect the sign
 
 ### Docs
 
-`doxygen` from the repo root → `docs/doxygen/html/index.html` (git-ignored; `doxygen` is
-not installed on this machine). All C and Python code carries Doxygen-style comments
+`doxygen` from the repo root → `docs/doxygen/html/index.html`, which is committed:
+regenerate and commit it alongside comment changes. The only
+expected warnings are undocumented test helpers in `gui_python/tests/`. All C and Python code carries Doxygen-style comments
 (`@file`, `@brief`, `@param`, `@return`); Python docstrings use the same `@` tags, and
 `##` line comments document attributes/constants. Keep new code in that style.
 

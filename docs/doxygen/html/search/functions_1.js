@@ -1,0 +1,15 @@
+var searchData=
+[
+  ['accel_5fsim_5feval_0',['accel_sim_eval',['../accel__sim_8c.html#a629c765c7948e7edebfd7208affe8c97',1,'accel_sim_eval(wave_func_t func, float amp_g, float t_s):&#160;accel_sim.c'],['../accel__sim_8h.html#a629c765c7948e7edebfd7208affe8c97',1,'accel_sim_eval(wave_func_t func, float amp_g, float t_s):&#160;accel_sim.c']]],
+  ['accel_5fsim_5fget_5faxis_1',['accel_sim_get_axis',['../accel__sim_8c.html#a6f78df0a41c89fa281b9d69770d1b580',1,'accel_sim_get_axis(axis_t axis):&#160;accel_sim.c'],['../accel__sim_8h.html#a6f78df0a41c89fa281b9d69770d1b580',1,'accel_sim_get_axis(axis_t axis):&#160;accel_sim.c']]],
+  ['accel_5fsim_5finit_2',['accel_sim_init',['../accel__sim_8c.html#a6d681e76a1aded47ae1bc1367481f53d',1,'accel_sim_init(void):&#160;accel_sim.c'],['../accel__sim_8h.html#a6d681e76a1aded47ae1bc1367481f53d',1,'accel_sim_init(void):&#160;accel_sim.c']]],
+  ['accel_5fsim_5freset_5fdefaults_3',['accel_sim_reset_defaults',['../accel__sim_8c.html#a90535646673e3735524737919265a9cd',1,'accel_sim_reset_defaults(void):&#160;accel_sim.c'],['../accel__sim_8h.html#a90535646673e3735524737919265a9cd',1,'accel_sim_reset_defaults(void):&#160;accel_sim.c']]],
+  ['accel_5fsim_5fset_5faxis_4',['accel_sim_set_axis',['../accel__sim_8c.html#a8bcb9e932861d9af2b518db49bdbb4c1',1,'accel_sim_set_axis(axis_t axis, const axis_cfg_t *cfg):&#160;accel_sim.c'],['../accel__sim_8h.html#a8bcb9e932861d9af2b518db49bdbb4c1',1,'accel_sim_set_axis(axis_t axis, const axis_cfg_t *cfg):&#160;accel_sim.c']]],
+  ['accel_5fsim_5fstart_5',['accel_sim_start',['../accel__sim_8c.html#a7b0a3cafc5b6cb4a5c84ac3ad76b327c',1,'accel_sim_start(void):&#160;accel_sim.c'],['../accel__sim_8h.html#a7b0a3cafc5b6cb4a5c84ac3ad76b327c',1,'accel_sim_start(void):&#160;accel_sim.c']]],
+  ['accel_5fsim_5fstop_6',['accel_sim_stop',['../accel__sim_8c.html#a9169838b1528778662a8c209e98d9aa0',1,'accel_sim_stop(void):&#160;accel_sim.c'],['../accel__sim_8h.html#a9169838b1528778662a8c209e98d9aa0',1,'accel_sim_stop(void):&#160;accel_sim.c']]],
+  ['accel_5fsim_5fvalid_5famp_7',['accel_sim_valid_amp',['../accel__sim_8c.html#a1c827a19fda12d7b178971357ab83401',1,'accel_sim_valid_amp(unsigned amp_g):&#160;accel_sim.c'],['../accel__sim_8h.html#a1c827a19fda12d7b178971357ab83401',1,'accel_sim_valid_amp(unsigned amp_g):&#160;accel_sim.c']]],
+  ['accel_5fsim_5fvalid_5ffs_8',['accel_sim_valid_fs',['../accel__sim_8c.html#a2959131776021f02fa9793c46a27c6a4',1,'accel_sim_valid_fs(unsigned fs_hz):&#160;accel_sim.c'],['../accel__sim_8h.html#a2959131776021f02fa9793c46a27c6a4',1,'accel_sim_valid_fs(unsigned fs_hz):&#160;accel_sim.c']]],
+  ['accel_5fsim_5fvalid_5ffunc_9',['accel_sim_valid_func',['../accel__sim_8c.html#a3921b02052fda90ae6d07740f9b432c8',1,'accel_sim_valid_func(int func):&#160;accel_sim.c'],['../accel__sim_8h.html#a3921b02052fda90ae6d07740f9b432c8',1,'accel_sim_valid_func(int func):&#160;accel_sim.c']]],
+  ['app_5fmain_10',['app_main',['../main_8c.html#a630544a7f0a2cc40d8a7fefab7e2fe70',1,'main.c']]],
+  ['available_5fports_11',['available_ports',['../serial__worker_8py.html#a8acd4cd4bed102caae1c6f2ef7158f40',1,'serial_worker']]]
+];

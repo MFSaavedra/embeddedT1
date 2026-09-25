@@ -1,0 +1,26 @@
+var app__config_8h =
+[
+    [ "ACCEL_BATCH_MAX", "app__config_8h.html#a8ad5a467ac186ab2d97a8504705024b0", null ],
+    [ "ACCEL_BATCH_MS", "app__config_8h.html#afdf9297e46d4a79d2009a71e6c5ea22e", null ],
+    [ "ACCEL_DEFAULT_AMP_G", "app__config_8h.html#a2292b512bcdc13926a140c537f4cd464", null ],
+    [ "ACCEL_DEFAULT_FS_HZ", "app__config_8h.html#ad2395b162ea383dea532ca81c4f25a0b", null ],
+    [ "ACCEL_DEFAULT_FUNC", "app__config_8h.html#ab72297cc1566ce88904eb03abdd9fbd2", null ],
+    [ "ACCEL_F1_HZ", "app__config_8h.html#a85a4a2326ae43ee89d853f0f1c0ec668", null ],
+    [ "ACCEL_F2_HZ", "app__config_8h.html#a84b260269c917d4dd43dc6143ccd6278", null ],
+    [ "ACCEL_F_HZ", "app__config_8h.html#ad72b8f8fcbf4e30f586f2e7ff4428402", null ],
+    [ "ACCEL_QUEUE_LEN", "app__config_8h.html#a6da7226b2bc5b6ecfa6c9f9afc88d351", null ],
+    [ "ACCEL_TICK_HZ", "app__config_8h.html#af1730760fe6c14dfe2bd890313d5b747", null ],
+    [ "ENV_DEFAULT_PERIOD_S", "app__config_8h.html#a7c88887f71159e267e3ab1e3344972ff", null ],
+    [ "ENV_HUM_MAX_PCT", "app__config_8h.html#a553f4ca5a589d2ee521afd0c2e411274", null ],
+    [ "ENV_HUM_MIN_PCT", "app__config_8h.html#ab0f248b08cd4763d56af36d5d5d47d95", null ],
+    [ "ENV_TEMP_MAX_C", "app__config_8h.html#a213085d13838d5149c612895ee0a781e", null ],
+    [ "ENV_TEMP_MIN_C", "app__config_8h.html#ac459e487f494b5f576063a90431c512b", null ],
+    [ "FW_VERSION", "app__config_8h.html#a80bd8a83eaaf4466b44c61321c39b11b", null ],
+    [ "LINK_BAUD", "app__config_8h.html#a19b3e3f0ee4d712f71e2c19836c6635f", null ],
+    [ "LINK_BAUD_REVERT_MS", "app__config_8h.html#a86eea9d6e3d128f9df7ca0c2210139a1", null ],
+    [ "LINK_MAX_FRAME", "app__config_8h.html#a0f0f0ed73dafa168755799cadfad64c0", null ],
+    [ "LINK_MAX_LINE", "app__config_8h.html#aaa0b32399ba661de10dc0b357cb65335", null ],
+    [ "LINK_RX_BUF_SIZE", "app__config_8h.html#ad0df91302a9e8f5b5f23490fb76d871d", null ],
+    [ "LINK_TX_BUF_SIZE", "app__config_8h.html#aa2c4dd6a20f70a0a6094d29a1847f11c", null ],
+    [ "LINK_UART_NUM", "app__config_8h.html#a39f1ad44b6d9ba0e76f8ecb079a0d05b", null ]
+];

@@ -1,0 +1,27 @@
+var searchData=
+[
+  ['_5farrivals_0',['_arrivals',['../classwidgets_1_1accel__plots_1_1AccelPlots.html#ac31fb6664abe7005b8cb98059179d9c9',1,'widgets::accel_plots::AccelPlots']]],
+  ['_5fbaud_1',['_baud',['../classmain__window_1_1MainWindow.html#af5128b4092e4dc35cdde76e0fa24f7c8',1,'main_window::MainWindow']]],
+  ['_5fbaud_5flock_2',['_baud_lock',['../classserial__worker_1_1SerialWorker.html#afc6f0c2e4e55255bcd2a4f30365d29ea',1,'serial_worker::SerialWorker']]],
+  ['_5fbaud_5fpending_3',['_baud_pending',['../classmain__window_1_1MainWindow.html#a505991dc748ee4271007ca7c23ef14b5',1,'main_window::MainWindow']]],
+  ['_5fbaud_5ftimer_4',['_baud_timer',['../classmain__window_1_1MainWindow.html#a341aba1d41b337967fbf6e72c7b3f5a8',1,'main_window::MainWindow']]],
+  ['_5fbusy_5',['_busy',['../classwidgets_1_1connection__panel_1_1ConnectionPanel.html#af7a57bdf81736cb6ebf4145b1884c6f1',1,'widgets::connection_panel::ConnectionPanel']]],
+  ['_5fcap_6',['_cap',['../classwidgets_1_1accel__plots_1_1AccelPlots.html#af88870ce45cdbf5fe24535d2f622dce2',1,'widgets::accel_plots::AccelPlots']]],
+  ['_5fconnected_7',['_connected',['../classwidgets_1_1connection__panel_1_1ConnectionPanel.html#a42b8a060848244e8d0369d2a10bfc814',1,'widgets::connection_panel::ConnectionPanel']]],
+  ['_5fcounter_5flabel_8',['_counter_label',['../classmain__window_1_1MainWindow.html#a9754c57394d8f21d6026962061327380',1,'main_window::MainWindow']]],
+  ['_5fcurves_9',['_curves',['../classwidgets_1_1accel__plots_1_1AccelPlots.html#a56dfc17f8ba77da7fa18e9008f01c096',1,'widgets::accel_plots::AccelPlots']]],
+  ['_5ffilled_10',['_filled',['../classwidgets_1_1accel__plots_1_1AccelPlots.html#a43cd66b6df5c1d2b5bddff4e196e0018',1,'widgets::accel_plots::AccelPlots']]],
+  ['_5fframes_5fbad_11',['_frames_bad',['../classmain__window_1_1MainWindow.html#a660495784a8395e964dc697e41a696b1',1,'main_window::MainWindow']]],
+  ['_5fframes_5fok_12',['_frames_ok',['../classmain__window_1_1MainWindow.html#a808fdf173239b16438541a975ed32aff',1,'main_window::MainWindow']]],
+  ['_5fidx_13',['_idx',['../classwidgets_1_1accel__plots_1_1AccelPlots.html#a10e96b7a35bcc8b8b0d218cfa7cbaf8d',1,'widgets::accel_plots::AccelPlots']]],
+  ['_5fpending_5fbaud_14',['_pending_baud',['../classserial__worker_1_1SerialWorker.html#a78d009b441849bcc807a5cf07c144caa',1,'serial_worker::SerialWorker']]],
+  ['_5fplots_15',['_plots',['../classwidgets_1_1accel__plots_1_1AccelPlots.html#a1717f3caf9ffb01caf3b8d0fc9ec0ca7',1,'widgets::accel_plots::AccelPlots']]],
+  ['_5frate_16',['_rate',['../classwidgets_1_1accel__plots_1_1AccelPlots.html#aa9d90bc46677eacfce6d7860eed9e8b2',1,'widgets::accel_plots::AccelPlots']]],
+  ['_5frate_5ft0_17',['_rate_t0',['../classwidgets_1_1accel__plots_1_1AccelPlots.html#a9f3163c578bc6a8693046d40e4bed3b9',1,'widgets::accel_plots::AccelPlots']]],
+  ['_5fser_18',['_ser',['../classserial__worker_1_1SerialWorker.html#a41f8b4a327e950c06bc654e70899565f',1,'serial_worker::SerialWorker']]],
+  ['_5fstop_19',['_stop',['../classserial__worker_1_1SerialWorker.html#ae2284d411a6cccb9f913442fbbb78090',1,'serial_worker::SerialWorker']]],
+  ['_5ft_20',['_t',['../classwidgets_1_1accel__plots_1_1AccelPlots.html#a4fe19f8f61eee640f5503d0eb584c8fb',1,'widgets::accel_plots::AccelPlots']]],
+  ['_5ftimer_21',['_timer',['../classwidgets_1_1accel__plots_1_1AccelPlots.html#a1bd217b9f241cf058225dadb973c6c47',1,'widgets::accel_plots::AccelPlots']]],
+  ['_5fv_22',['_v',['../classwidgets_1_1accel__plots_1_1AccelPlots.html#ad2a45161ad6b13d5842d8dc86b6d8400',1,'widgets::accel_plots::AccelPlots']]],
+  ['_5fwrite_5flock_23',['_write_lock',['../classserial__worker_1_1SerialWorker.html#a4e5c1ac7b24a1c1fbcc03d435fea49f1',1,'serial_worker::SerialWorker']]]
+];
